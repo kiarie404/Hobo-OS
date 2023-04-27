@@ -18,11 +18,28 @@ mod keyboard_interface;
 
 #[no_mangle]
 pub extern "C" fn kmain() -> (){
-    println!("unbuilt, insecure, not_tired");
+    let x :i32 = 20;
+    println!("unbuilt, insecure, not_tired , {}", x);
+    print_memory_locations();
 
     keyboard_interface::continuous_keyboard_read();
 
     println!("unbuilt, insecure, not_tired");
+}
+
+fn print_memory_locations(){
+    extern "C" {
+        static _text_start : usize;
+        static _memory_end : usize;
+        static _heap_start : usize;
+        static _heap_size : usize;
+    }
+
+    unsafe{
+        // println!("memory start : {:x}", _memory_start);
+        println!("memory end : {:x}", _heap_size);
+        // println!("memory size : {:x}", (_memory_end - _memory_start));
+    }
 }
 
 // define the panic handler function for the bare_metal software
