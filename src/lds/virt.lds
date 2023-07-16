@@ -33,7 +33,7 @@ SECTIONS
 	 *(.text .text.*)
 	
     PROVIDE(_text_end = .);
-	/
+	
   } >ram AT>ram :text
    
    PROVIDE(_global_pointer = .);

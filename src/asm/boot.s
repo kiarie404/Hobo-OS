@@ -1,70 +1,86 @@
-# boot.S
+# Its main funtions are :
+    # _choose_bootloading_HART
+    # _clear_BSS_section
+    # _initialize_registers_for_kmain (prepare its environment)
+    # _call_kmain (give kernel code control)
 
-# norvc implies that the assemly code should not use reduced(compressed) instructions
+
+
+# notify the assembler that we will not be using Riscv Compressed instructions
+# we need simplicity and predictability more than we need memory efficient code
 .option norvc
 
-# uninitialized variables get declared under .section .data
+# this is where we will store global initialized variables
+# and we have no global data yet
 .section .data
 
-# the instructions get declared under .section .text.init
+# this is code that will get called before the kmain function
+# .text.init sections typically store startup code that sets up the environment for the rest of the code
 .section .text.init
 
-# I have made it global so that the linker becomes aware of the _start function
-# It is assembly so there is no need of #no_mangle
+# _start is declared as a global symbol so that the linker gets to detect it 
+# This will be the entry point of the bootloader
 .global _start
 _start:
-	# Any hardware threads (hart) that are not bootstrapping
-	# need to wait for an interrupt. This interrupt will only be supplied by the kernel that is yet to be loaded after booting
-	csrr	t0, mhartid	# read the Hart ID from the mhartid and store it in register t0
-	bnez	t0, 3f		# bnez checks if the value contained in the register is zero, if value == zero, continue. Else, skip to code block 3f
+    j   _choose_bootloading_HART
+    
 
-	# Supervisor Address Translation and Protection (SATP) register should be zero, but let's make sure --- we start on a clean sheet.
-	csrw	satp, zero
+_fetch_kernel_global_pointer:
+    .option push    # save and disable all current assembler directives
+    .option norelax # disable code optimization, this is a delicate operation; we need no surprises
+    la gp, _global_pointer # load the address of _global_pointer label into the gp register
+    .option pop  # restore previous assembler directives
+    j _clear_BSS_section
 
-.option push
+
+_choose_bootloading_HART:
+    # fetch the ID of the current Hardware Thread (HART) and store it in the temporary register t1
+    csrr t1, mhartid 
+    bnez t1, _make_HART_sleep # If HART ID is not ZERO, make that HART sleep.
+                             # If HART IS is zero, _fetch_kernel_global_pointer
+    j   _fetch_kernel_global_pointer
+    
 
 
-# Disable linker instruction relaxation for the `la` instruction below.
-# This disallows the assembler from assuming that `gp` is already initialized.
-# This causes the value stored in `gp` to be calculated from `pc`.
-.option norelax
-	la		gp, _global_pointer
-.option pop
-	# The BSS section is expected to be zero
-	la 		a0, _bss_start
-	la		a1, _bss_end
-	bgeu	a0, a1, 2f
-1:
-	sd		zero, (a0)
-	addi	a0, a0, 8
-	bltu	a0, a1, 1b
-2:
-	# Control registers, set the stack, mstatus, mepc,
-	# and mtvec to return to the main function.
-	# li		t5, 0xffff;
-	# csrw	medeleg, t5
-	# csrw	mideleg, t5
-	la		sp, _stack_end
-	# We use mret here so that the mstatus register
-	# is properly updated.
-	li		t0, (0b11 << 11) | (1 << 7) | (1 << 3)
-	csrw	mstatus, t0
-	la		t1, kmain
-	csrw	mepc, t1
-	la		t2, asm_trap_vector
-	csrw	mtvec, t2
-	li		t3, (1 << 3) | (1 << 7) | (1 << 11)
+_make_HART_sleep:
+    wfi                 # power off and wait for an interrupt
+    j _make_HART_sleep  # continuously make HART sleep, we are running a single_core OS
+
+
+_clear_BSS_section:
+    la a1, _bss_start
+    la a2, _bss_end
+    j _clear_BSS_section_loop
+
+_clear_BSS_section_loop:
+    sd      zero, (a1)                          # store zero in the 64bit memory space referenced by a1
+    addi    a1, a1, 8                             # increment the address by 64 bits.
+    bltu    a1, a2, _clear_BSS_section_loop     # loop until we reach the last address of the bss section
+    j       _initialize_registers_for_kmain     # if we have zerord out the BSS section, _initialize_registers_for_kmain
+
+_initialize_registers_for_kmain:
+    la		sp, _stack_end                          # setup the stack pointer
+    li		t0, (0b11 << 11) | (1 << 7) | (1 << 3)  # Set MPP field to 11 (Machine Mode), 
+                                                    # Bit 7, sets MPIE bit to 1 ; meaning interrupts from lower levels can get handled by machine mode if invoked
+                                                    # Bit 3, Sets the MIE bit to 1 ; meaning the CPU can receive interrups while in machine mode
+    csrw	mstatus, t0
+
+    # set kmain to be the value that will be pasted tp the PC counter after calling mret
+    la		t1, kmain
+	csrw	mepc, t1   
+
+    #set the Machine trap vector
+    la		t2, asm_trap_vector
+	csrw	mtvec, t2  
+
+    # allow specific interrupts
+    # 3 == Software Interrupts, 7 == Timer Interrupts, 11 == External Interrupts
+    li		t3, (1 << 3) | (1 << 7) | (1 << 11) 
 	csrw	mie, t3
-	la		ra, 4f
-	mret
-3:
 
-	# Parked harts go here. We need to set these
-	# to only awaken if it receives a software interrupt,
-	# which we're going to call the SIPI (Software Intra-Processor Interrupt).
-	# We only use these to run user-space programs, although this may
-	# change.
-4:
-	wfi
-	j		4b
+    #  set kmain return address to _make_HART_sleep (a shutdown)
+    la      ra, _make_HART_sleep
+
+    # call kmain (indirectly, this is because mret will make the cpu program counter to point to kmain)
+    mret
 
