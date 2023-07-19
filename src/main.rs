@@ -1,42 +1,41 @@
-// denounce using the usual entry point chain
-#![no_main]   
 
-// this code does not depend on any standard Library. 
-// It however depends on the Rust Core Library : https://doc.rust-lang.org/beta/core/index.html
-#![no_std]
+#![no_std]  // we will no depend on Rust Standard Library and Libc
+#![no_main] // we will define our own entry point sequence using the linker + Bootloader
+#![feature(panic_info_message)]
 
 
-use core::panic::PanicInfo;
-
-
-// imported modules section
+// mod utilities;
+mod drivers;
 mod asm;
-mod screen_output;
-mod keyboard_interface;
+mod stdout;
+mod stdin;
+
+
+// usage of accessible modules
+use core::{arch::asm, panic::PanicInfo};
+use core::fmt::Write; // enable the use of Write functions in this scope
+use stdin::continuous_keyboard_read;
 
 
 
-#[no_mangle]
-pub extern "C" fn kmain() -> (){
-    // let y = vec![1,2,3];
-    let x :i32 = 20;
-    println!("unbuilt, insecure, not_tired , {}", x);
-
-    // let start = text_start();
-    // println!("Memory start : {:x}", start);
-    // unsafe {println!("Memory start : {:x}", HEAP_START);}
-
-    keyboard_interface::continuous_keyboard_read();
-
-    println!("unbuilt, insecure, not_tired");
+// defining the function that will always get called after a panic
+#[panic_handler]
+fn panic_handler (panic_info: &PanicInfo) -> !{
+    // make the current CPU_core sleep endlessly and wait for Interrupt
+    let panic_location = panic_info.location().unwrap();
+    let panic_message = panic_info.message().unwrap();
+    println!("Panic occured : in file : {}, line {}, with the message : {:?}",
+                                                 panic_location.file(), panic_location.line(), panic_message);
+    loop {
+       unsafe { asm!("wfi");  }
+    }
 }
 
 
-// define the panic handler function for the bare_metal software
-// However this &PanicInfo does not contain unwinding information. Traceback -- we have disabled unwinding 
-// And anyway it wil not get called upon because panics cause immediate program termination
-#[panic_handler]
-fn panic_response(_info: &PanicInfo<'_> ) -> !{
-    loop {     } // loop indefinately
+// defining the entry point function
+#[no_mangle]
+pub extern "C" fn kmain () {
+    println!("jhgjgjhg {}", 5);
+    continuous_keyboard_read();
 }
 

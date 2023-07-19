@@ -1,9 +1,8 @@
-# trap.S
-# In the future our trap vector will go here.
-
+.section .text
 .global asm_trap_vector
-# This will be our trap vector when we start
-# handling interrupts.
-asm_trap_vector:
-# The mret instruction in RISC-V assembly is used to return control from a trap handler to a previous machine mode execution state
-	mret
+
+asm_trap_vector :
+    # I will redirect this to a function defined in Rust.   
+    # Assembly code aint that smooth
+    # for now we will do nothing
+    mret

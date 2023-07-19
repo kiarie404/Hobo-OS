@@ -1,3 +1,7 @@
+/* This is a linker script specifically made to instruct the linker on .., */
+/* ... how to build elf files for virt Riscv Machine on Qemu */
+
+/* The explanation for this script has been described in the developer documentatio */
 
 OUTPUT_ARCH( "riscv" )
 
@@ -27,11 +31,8 @@ SECTIONS
     PROVIDE(_text_start = .);
 
     *(.text.init)
-	
-	*(.eh_frame)
-
-	 *(.text .text.*)
-	
+	  *(.eh_frame)
+	  *(.text .text.*)
     PROVIDE(_text_end = .);
 	
   } >ram AT>ram :text

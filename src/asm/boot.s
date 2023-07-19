@@ -1,7 +1,9 @@
-# Its main funtions are :
+# The main functions of this Bootloader are : 
     # _choose_bootloading_HART
     # _clear_BSS_section
     # _initialize_registers_for_kmain (prepare its environment)
+        #   for esecuting code : [stack_pointer, global_pointer]
+        #   for exception handling and interrupt handling [mstatus, mepc, mie]
     # _call_kmain (give kernel code control)
 
 
@@ -16,7 +18,7 @@
 
 # this is code that will get called before the kmain function
 # .text.init sections typically store startup code that sets up the environment for the rest of the code
-.section .text.init
+.section .text.init 
 
 # _start is declared as a global symbol so that the linker gets to detect it 
 # This will be the entry point of the bootloader
@@ -24,7 +26,9 @@
 _start:
     j   _choose_bootloading_HART
     
-
+# The gp register currently contains the gp_memory address of the loader.
+# We need to update it to point to the kernel's gp
+# We numb out optimizations to make sure the update happens explicitly
 _fetch_kernel_global_pointer:
     .option push    # save and disable all current assembler directives
     .option norelax # disable code optimization, this is a delicate operation; we need no surprises
@@ -38,23 +42,25 @@ _choose_bootloading_HART:
     csrr t1, mhartid 
     bnez t1, _make_HART_sleep # If HART ID is not ZERO, make that HART sleep.
                              # If HART IS is zero, _fetch_kernel_global_pointer
-    j   _fetch_kernel_global_pointer
+    j   _fetch_kernel_global_pointer  # after choosing the HART, we move on to configure essential registers 
+                                      # [gp, sp, ]
     
 
-
+# this does not completely shut down the HART
 _make_HART_sleep:
     wfi                 # power off and wait for an interrupt
     j _make_HART_sleep  # continuously make HART sleep, we are running a single_core OS
 
-
+# the bootloader needs to make sure that all uninitialized dlobal values of...
+# ...the kernel are ZEROED out
 _clear_BSS_section:
     la a1, _bss_start
     la a2, _bss_end
     j _clear_BSS_section_loop
 
 _clear_BSS_section_loop:
-    sd      zero, (a1)                          # store zero in the 64bit memory space referenced by a1
-    addi    a1, a1, 8                             # increment the address by 64 bits.
+    sd      zero, (a1)                          # store z mepc, mieero in the 64bit memory space referenced by a1
+    addi    a1, a1, 8                           # increment the address by 64 bits. (8 bytes)
     bltu    a1, a2, _clear_BSS_section_loop     # loop until we reach the last address of the bss section
     j       _initialize_registers_for_kmain     # if we have zerord out the BSS section, _initialize_registers_for_kmain
 
@@ -75,12 +81,12 @@ _initialize_registers_for_kmain:
 
     # allow specific interrupts
     # 3 == Software Interrupts, 7 == Timer Interrupts, 11 == External Interrupts
-    li		t3, (1 << 3) | (1 << 7) | (1 << 11) 
+    li		t3, (1 << 1) | (1 << 3) | (1 << 5) | (1 << 7) | (1 << 9) | (1 << 11) 
 	csrw	mie, t3
 
     #  set kmain return address to _make_HART_sleep (a shutdown)
     la      ra, _make_HART_sleep
 
-    # call kmain (indirectly, this is because mret will make the cpu program counter to point to kmain)
+    # call kmain (indirectly, this is because mret will make the cpu program counter to point to the value in mepc(kmain))
     mret
 
