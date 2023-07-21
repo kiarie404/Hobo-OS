@@ -9,6 +9,7 @@ mod drivers;
 mod asm;
 mod stdout;
 mod stdin;
+mod memory;
 
 
 // usage of accessible modules
