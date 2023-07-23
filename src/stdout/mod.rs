@@ -1,4 +1,4 @@
-//!  This module provides required to write utf-8 stream of character(s) to the screen.   
+//!  This module provides the functions and macros required to write utf-8 stream of character(s) to the screen.   
 //!  In this case, the the screen is the console.    
 //!  The UART device out transmission is connected to the Console
 

@@ -75,5 +75,6 @@ SECTIONS
   . = ALIGN(4096);
   PROVIDE(_heap_start = .);
   PROVIDE(_heap_size = _memory_end - _heap_start);
-  PROVIDE(_heap_end = _memory_end);
+  PROVIDE(_heap_end = _memory_end - 1);  /* minusing 1 because the memory_end address is unusable. Let the last address be usable*/
+  
 }

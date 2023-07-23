@@ -3,9 +3,12 @@
 
 mod memory_abstractions;
 mod memory_errors;
-use memory_abstractions::{SimpleHeapLayout, DescriptorValue, PageDescriptor, Page, PageMMIO};
+mod tests; // tests that test the functions defined in this module
+use memory_abstractions::{FullHeapLayout, DescriptorValue, PageDescriptor, Page, PageMMIO};
 use memory_errors::{MemoryAllocatioErrors, MemoryDeallocatioError};
 use core::mem::size_of;
+use crate::{print, println};
+
 
 // get the heap memory labels from the /asm/memory_export.s assembly file
 extern "C"{
@@ -18,6 +21,13 @@ static END   : &usize = unsafe{&HEAP_END};
 static mut ALLOC_START : usize = 0;
 static mut NUM_DP : usize = 0; // the number of pages created. THe number of pages also equals the number of descriptors
 
+// The FullHeapLayout contains all metadata about the Heap stats, The allocations and deallocations
+// The FullHeapLayout contents get updated by the following functions :
+// 1. The init_memory_abtraction
+// 2. The alloc function
+// 3. The Dealloc function
+static mut HEAP_LAYOUT : FullHeapLayout = FullHeapLayout::new();
+
 // calculates total Heap size in bytes
 fn get_heap_size() -> usize{
     let heap_memory_size = ((*END + 1) - *START) * size_of::<u8>(); // size in bytes
@@ -25,9 +35,11 @@ fn get_heap_size() -> usize{
 }
 
 /// This function uses the Page and Descriptor structs to define the actual Heap layout
-fn init_memory_abtraction(){
+pub fn init_memory(){
+    println!(">>>> Initializing memory");
     // clear memory, make every byte in the heap a zero
     clear_entire_heap(); 
+
     // Determine Heap layout, and update the global variables {ALLOC_START, NUM_DP}.
     determine_heap_layout();
 
@@ -35,8 +47,8 @@ fn init_memory_abtraction(){
 
 // This function traverses the entire heap and makes sure each value under each address is zero
 fn clear_entire_heap(){
-    let mut index = *START;
-    while index <= *END {
+    let mut index = unsafe{HEAP_START.clone()};
+    while index <= unsafe{HEAP_END} {
         let ptr_to_byte = index as *mut u8;
         unsafe { ptr_to_byte.write_volatile(0)};
         index = index + size_of::<u8>();
@@ -53,8 +65,8 @@ fn align (val: usize, order: usize) -> usize{
 }
 
 // This function returns the SimpleHeapLayout, outliing the numer of Pages to be created, Descriptors and the actial ALLOC address
-// It also modifies the static ALLOC_START address
-fn determine_heap_layout() -> SimpleHeapLayout{
+// It also modifheap_end   = Some(HEAP_END)ies the static ALLOC_START address
+fn determine_heap_layout(){
     // calculate the MAXIMUM number of dexcriptors and Pages that can be made in the heap space
     // MAX number = (heap_memory_size) / (sizeof_page_and_descriptor)
     let heap_memory_size = get_heap_size(); // size in bytes
@@ -65,35 +77,226 @@ fn determine_heap_layout() -> SimpleHeapLayout{
     // The ALLOC_START is aligned to 4096
     // This is the place where the pages to be allocated start
     // This position comes after the decscriptors
-    let address_afer_last_descriptor : usize = (*START + max_num_dp);
-    let alloc_start : usize = align(address_afer_last_descriptor, 12) ;
+    let address_after_last_descriptor : usize = (*START + max_num_dp);
+    let alloc_start : usize = align(address_after_last_descriptor, 12) ;
 
     // Now with the Alloc_start position known, we can get the actual number of pages and descriptors
     let actual_num_pages : usize = ((*END + 1) - alloc_start) * size_of::<u8>();
+    let last_page_address = alloc_start + (actual_num_pages - 1);
 
-    // after determining the Heap Layout, update the Global Variable {ALLOC_START, NUM_DP}
+    // after determining the Heap Layout, update the HeapLayout structure
     unsafe {
+        HEAP_LAYOUT.heap_start = Some(HEAP_START);
+        HEAP_LAYOUT.heap_end   = Some(HEAP_END);
+        HEAP_LAYOUT.heap_size = Some(heap_memory_size);
+        HEAP_LAYOUT.num_of_descriptors = Some(actual_num_pages);
+        HEAP_LAYOUT.first_descriptor_address = Some(HEAP_START);
+        HEAP_LAYOUT.last_descriptor_address = Some(address_after_last_descriptor - 1);
+        HEAP_LAYOUT.first_padding_address = Some(address_after_last_descriptor);
+        HEAP_LAYOUT.last_padding_address = Some(alloc_start - 1);
+        HEAP_LAYOUT.alloc_start_address = Some(alloc_start);
+        HEAP_LAYOUT.num_of_pages = Some(actual_num_pages);
+        HEAP_LAYOUT.last_page_address = Some(last_page_address);
+        HEAP_LAYOUT.unused_bytes = Some(HEAP_END - last_page_address);
+
+
         ALLOC_START = alloc_start.clone();
         NUM_DP = actual_num_pages.clone();
+
+        // show_layout();
     }
 
-    return SimpleHeapLayout{  num: actual_num_pages, alloc_address: alloc_start };
+    
 }
 
 // takes in the number of requested pages and returns the address of the first memory byte of the contiguous allocation
 // returns an error if requested zero pages
 // returns an error if No contiguous free space is found
-fn alloc(req_pages: usize) -> Result<usize, MemoryAllocatioErrors>{
+pub fn alloc(req_pages: usize) -> Result<usize, MemoryAllocatioErrors>{
+    println!(">>>> Allocating {} Pages....", req_pages);
     // check if required pages is zero. If its zero, throw an error...
     if req_pages == 0 { return Err(MemoryAllocatioErrors::ZeroPagesRequested("Zero pages were requested from the allocator"));}
-    else { // traverse the array of descriptors, lookng for a contiguos free space
-        let search_result = find_first_contiguous(req_pages);
+    else { // traverse the array of descriptors, lookng for a contiguous free space
+        let search_result = find_first_contiguous(req_pages); // return address of first contiguous space
+        let mut first_descriptor_index : usize;
+
         match search_result {
-           Some(descriptor_index) => return Ok(descriptor_index),
+           Some(descriptor_index) => first_descriptor_index = descriptor_index,
            None => return Err(MemoryAllocatioErrors::NoFreeContiguousSpace("No Free contiguous pages were found")) 
         }
+
+        // Now that we have the index of the first Descriptors of the contiguous space....
+        fill_descriptors(first_descriptor_index, req_pages); // fill the decriptors with appropriate values
+
+        // update the HeapLayout
+        // THe Allocator DOES NOT directly update HEAP_LAYOUT.num_of_allocated_pages, it calls the update_heap_page_states function
+        // It only updates HEAP_LAYOUT.num_of_allocations_done
+        // This is for security reasons
+        unsafe{HEAP_LAYOUT.num_of_allocations_done = (HEAP_LAYOUT.num_of_allocations_done ) + req_pages;}
+        
+
+        // Finally return the address of the Page that directly corresponds with the First Descriptor
+        let page_address = get_page_addr_from_page_index(first_descriptor_index);
+        return  Ok(page_address);
     }
 }
+
+fn fill_descriptors(first_descriptor_index: usize, req_pages: usize){
+    unsafe {
+        let base_descriptor_ptr = HEAP_START as *mut PageDescriptor; // access the array of descriptors
+        let first_descriptor_ptr = base_descriptor_ptr.add(first_descriptor_index); // access the first descriptor to be allocated 
+        let first_descriptor_ref = &mut *first_descriptor_ptr; 
+
+        // if the requeired pages were a MAX of 1, just give the descriptor the value : FirstAndLast
+        if req_pages == 1 { first_descriptor_ref.set_flast();   }
+        else {
+            let last_index = req_pages - 1;
+            for index in (0..req_pages){
+               let desc_ptr = first_descriptor_ptr.add(index);
+               let desc_ref = &mut *desc_ptr;
+
+               if (index == 0){
+                    desc_ref.set_first();
+                    println!("   >>>> Ox{:x} : {:?}",desc_ptr as usize, desc_ref.get_val() );
+               }
+
+               else if (index < last_index){
+                    desc_ref.set_middle();
+                    println!("   >>>> Ox{:x} : {:?}",desc_ptr as usize, desc_ref.get_val() );
+               }
+
+               else {
+                    desc_ref.set_last();
+                    println!("   >>>> Ox{:x} : {:?}",desc_ptr as usize, desc_ref.get_val() );
+               }
+
+            }
+        }
+    
+
+    }
+}
+
+fn update_heap_page_states(){
+    let mut num_of_allocated_pages : usize;
+    let mut num_of_unallocated_pages: usize;
+    
+    (num_of_allocated_pages, num_of_unallocated_pages) = get_page_counts();
+    unsafe{
+        HEAP_LAYOUT.num_of_allocated_pages = num_of_allocated_pages;
+        HEAP_LAYOUT.num_of_unallocated_pages = num_of_unallocated_pages;
+    }
+}
+
+// counts the number of allocated and unallocated descriptors 
+// It returns (allocated, unallocated)
+fn get_page_counts() -> (usize, usize){
+    println!(">>>> Parsing the heap and determining the number of both allocated and unallocated pages...this will take some time...");
+    unsafe{
+        let base_desc_ptr = HEAP_START as *const PageDescriptor;
+        let mut count_of_allocated: usize = 0;
+        let mut count_of_unallocated : usize = 0;
+        for index in 0..NUM_DP{
+            let current_desc_ptr = base_desc_ptr.add(index);
+            let current_desc_ref = & *current_desc_ptr;
+            match current_desc_ref.get_val() {
+                DescriptorValue::Empty => count_of_unallocated = count_of_unallocated + 1,
+                DescriptorValue::FirstAndLast => count_of_allocated = count_of_allocated + 1,
+                DescriptorValue::FirstAndTaken => count_of_allocated = count_of_allocated + 1,
+                DescriptorValue::MiddleAndTaken => count_of_allocated = count_of_allocated + 1,
+                DescriptorValue::LastAndTaken => count_of_allocated = count_of_allocated + 1,
+            }   
+        }
+        
+
+        return (count_of_allocated,count_of_unallocated);
+    }
+}
+
+// checks if :
+    // All FirstTaken are followed by  Last, Middle,   BUT NOT Empty,  FirstTaken FirstLast
+    // All Middles are followed by LastTaken or Middle  BUT NOT empty, FirstLast, FirstTaken 
+    // All FirstLasts are followed by Empty, Flast, First BUT NOT Last, Middle, 
+    // All LastTakens are followed by Empty, First, Flast BUT NOT Last, Middle, 
+    // All Empty are followed by Empty, FirstTaken, Flast  BUT NOT Last, Middle
+pub fn check_descriptor_ordering() -> bool{
+    unsafe{
+        println!(">>>> Checking order of dexcriptors...");
+        let base_desc_ptr = HEAP_START as *const PageDescriptor;
+        let base_desc_ref = & *base_desc_ptr;
+
+        for index in 0..NUM_DP{
+            let current_desc_ptr = base_desc_ptr.add(index);
+            let current_desc_ref = & *current_desc_ptr;
+            let current_desc_val = current_desc_ref.get_val();
+            let next_desc_ptr = current_desc_ptr.add(1);
+            let next_desc_ref = & *next_desc_ptr;
+            let next_desc_val = next_desc_ref.get_val();
+
+            // deal with FirstTakens
+            match current_desc_val {
+                DescriptorValue::FirstAndTaken => {
+                    match next_desc_val {
+                        DescriptorValue::FirstAndTaken => return false,
+                        DescriptorValue::FirstAndLast => return false,
+                        DescriptorValue::MiddleAndTaken => {/* do nothing */},
+                        DescriptorValue::LastAndTaken => {/* do nothing */},
+                        DescriptorValue::Empty => return false
+                    }
+                },
+
+                DescriptorValue::FirstAndLast => {
+                    match next_desc_val {
+                        DescriptorValue::FirstAndTaken => {/* do nothing */},
+                        DescriptorValue::FirstAndLast => {/* do nothing */},
+                        DescriptorValue::MiddleAndTaken => return false,
+                        DescriptorValue::LastAndTaken => return false,
+                        DescriptorValue::Empty => {/* do nothing */}
+                    }
+                },
+
+                DescriptorValue::MiddleAndTaken => {
+                    match next_desc_val {
+                        DescriptorValue::FirstAndTaken => return false,
+                        DescriptorValue::FirstAndLast => return false,
+                        DescriptorValue::MiddleAndTaken => {/* do nothing */},
+                        DescriptorValue::LastAndTaken => {/* do nothing */},
+                        DescriptorValue::Empty => return false
+                    }
+                },
+
+                DescriptorValue::LastAndTaken => {
+                    match next_desc_val {
+                        DescriptorValue::FirstAndTaken => {/* do nothing */},
+                        DescriptorValue::FirstAndLast => {/* do nothing */},
+                        DescriptorValue::MiddleAndTaken => return false,
+                        DescriptorValue::LastAndTaken => return false,
+                        DescriptorValue::Empty => {/* do nothing */}
+                    }
+                },
+
+                DescriptorValue::Empty => {
+                    match next_desc_val {
+                        DescriptorValue::FirstAndTaken => {/* do nothing */},
+                        DescriptorValue::FirstAndLast => {/* do nothing */},
+                        DescriptorValue::MiddleAndTaken => return false,
+                        DescriptorValue::LastAndTaken => return false,
+                        DescriptorValue::Empty => {/* do nothing */}
+                    }
+                },
+            }
+
+
+        }
+
+        // if no false return happened
+        println!(">>>> Order of descriptors is fine");
+        return true;
+    }
+
+    // unimplemented!()
+}
+
 
 /// This function ...   
 /// 1. takes the Address of the first Page of a contiguous page allocation
@@ -103,10 +306,11 @@ fn alloc(req_pages: usize) -> Result<usize, MemoryAllocatioErrors>{
 /// Errors thrown include:  
 /// 1. Address passed to the function is not the first in its associated contiguous allocation
 /// 2. Address passed is not a valid address. because it is not found within the Heap Page section, or it is not a Page's first byte. 
-fn dealloc(page_addr: usize) -> Result<(), MemoryDeallocatioError>{
+pub fn dealloc(page_addr: usize) -> Result<(), MemoryDeallocatioError>{
+    println!(">>>> Deallocating contiguous memory at address : 0x{:x}...", page_addr);
     // validate page_addr... and move on to deallocation
     if check_if_page_within_heap(page_addr) == false { 
-        return Err(MemoryDeallocatioError::NonHeapAddressFound("Page address is not within the Heap")); }
+        return Err(MemoryDeallocatioError::NonHeapAddressFound("Page address is not within the Heap Memory range")); }
     else if check_if_page_top_addr(page_addr) == false {
         return Err(MemoryDeallocatioError::PageAddressIsMiddlePage("The address is not divisible by 4096"));
     }
@@ -114,15 +318,31 @@ fn dealloc(page_addr: usize) -> Result<(), MemoryDeallocatioError>{
         return Err(MemoryDeallocatioError::PageNotLeading("The Page address references to a Page that is not the leading page in the contiguous group of pages"));
     }
     else {
+        let page_index = get_page_index_from_addr(page_addr);
+        let deallocate_desc_results = empty_group_of_descriptors(page_index);
+        let mut emptied_descriptors: usize;
+        match deallocate_desc_results {
+            Ok(num) => emptied_descriptors = num,
+            Err(error) => return Err(error)
+        }
 
+        empty_group_of_pages(page_addr, emptied_descriptors);
+
+        // UPDATE HEAPLAYOUT
+        // THe DeAllocator DOES NOT directly update HEAP_LAYOUT.num_of_unallocated_pages,
+        // It only updates HEAP_LAYOUT.num_of_deallocations_done
+        // This is for security reasons
+        unsafe{HEAP_LAYOUT.num_of_deallocations_done = HEAP_LAYOUT.num_of_deallocations_done + emptied_descriptors;}
+        return Ok(());
+        
     }
 
-unimplemented!()
+// unimplemented!()
 }
 
 // Finds page index ; its location in the array of pages.  
 // It assumes that the First page is at ALLOC start and has the index 0 
-fn get_page_index(page_addr: usize) -> usize{
+fn get_page_index_from_addr(page_addr: usize) -> usize{
     // assuming the first page is index 0... the page index of passed page is...
     // index 0 is at page_address : ALLOC_addr + (4096 * 0)
     // index 1 is at page_address : ALLOC_addr + (4096 * 1)
@@ -136,7 +356,7 @@ fn get_page_index(page_addr: usize) -> usize{
 // function checks if the address is the first in the allocation    
 // This function assumes that the passed address is a valid page address    
 fn check_if_page_is_first(page_addr: usize) -> bool{
-    let page_index = get_page_index(page_addr);
+    let page_index = get_page_index_from_addr(page_addr);
     // it is assumed that the page index is equal to the descriptor index, 
     let desc_index = page_index;
     let subject_descriptor_ptr = (START + desc_index) as *const PageDescriptor;
@@ -172,6 +392,7 @@ fn check_if_page_top_addr(page_addr: usize) -> bool{
 // 1. The Index passed is not pointing to a first page
 // 2. THe contiguous descriptors are not in order : eg fisrt-middle-NO_LAST  OR first-NO_LAST 
 fn empty_group_of_descriptors(index: usize) -> Result<usize, MemoryDeallocatioError>{
+    println!(">>>> Deallocating descriptors....");
     unsafe{
      // get variables ready
      let base_ptr = HEAP_START as *mut PageDescriptor;
@@ -191,6 +412,7 @@ fn empty_group_of_descriptors(index: usize) -> Result<usize, MemoryDeallocatioEr
             // loop until you find the last Descriptor for that allocation. 
             // make sure the descriptors are in order
             let mut count: usize = 1;
+            println!(">>> Doing the order check...");
             loop {
                 let next_desc_ptr = subject_ptr.add(count);
                 let next_desc_ref = &mut *next_desc_ptr;
@@ -208,14 +430,17 @@ fn empty_group_of_descriptors(index: usize) -> Result<usize, MemoryDeallocatioEr
 
             // If the order is fine, then clear the contiguous descriptors
             count = 0;
+            println!(">>> Doing the emptying loop...");
             loop {
-                let next_desc_ptr = subject_ptr.add(count);
-                let next_desc_ref = &mut *next_desc_ptr; 
-                if next_desc_ref.get_val() == DescriptorValue::LastAndTaken {
-                    next_desc_ref.set_empty();
-                    return Ok(count+1);
+                let current_desc_ptr = subject_ptr.add(count);
+                let current_desc_ref = &mut *current_desc_ptr; 
+                if current_desc_ref.get_val() == DescriptorValue::LastAndTaken {
+                    current_desc_ref.set_empty();
+                    println!(">>>> Finished Emptying Descriptors....");
+                    return Ok(count+1); // returns the number of descriptors deallocated
                 }  
-                else {  next_desc_ref.set_empty(); }         
+                else {  current_desc_ref.set_empty();
+                        count = count + 1;  }         
             }
          }// end of looping.
      }
@@ -226,36 +451,47 @@ fn empty_group_of_descriptors(index: usize) -> Result<usize, MemoryDeallocatioEr
 
 // this function receives a lead page address and the number of contiguous pages that need to be freed.  
 // It then Zeroes all the pages involved
-fn empty_group_of_pages(page_addr: usize, num_pages: usize){
+fn empty_group_of_pages(page_addr: usize, req_pages: usize){
     unsafe {
         let base_page_ptr = page_addr as *mut PageMMIO;
         let base_page_ref = &mut *base_page_ptr;
+        let subject_index = get_page_index_from_addr(page_addr);
+        let subject_base_ptr = base_page_ptr.add(subject_index);
+        let subject_base_ref = &mut *subject_base_ptr;
 
-        for index in 0..num_pages{
-            let subject_ptr = base_page_ptr.add(index);
-            let subject_ref = &mut *subject_ptr;
+        for index in 0..req_pages{
+            let subject_ptr = subject_base_ptr.add(index);
+            let subject_ref = &mut *subject_base_ptr;
             subject_ref.clear();
         }
     }
 }
 
+fn get_page_addr_from_page_index(index: usize) -> usize { // returns page address associated with the descriptor index
+    let page_address = unsafe{(ALLOC_START as *const PageMMIO).add(index)}; 
+    return page_address as usize;
+}
 
 
-// this function takes the pointer_address to the first element of an array of u8s AND the number of bytes required contiguously
-// and returns the first array index of the first sufficient contiguous space
-// or it returns a None
-fn find_first_contiguous( req_val: usize) -> Option<usize>{
+
+// This function takes in the number of requested pages
+// It parses the descriptors, looking for a sufficient contiguous spae
+// If it finds space, it returns the Descriptor index of the leading descriptor of the contiguous space
+// If it doesn't find Space, It returns NONE
+fn find_first_contiguous( req_pages: usize) -> Option<usize>{
     let base_ptr = unsafe{HEAP_START as *const PageDescriptor}; // pointer to the start of the Array of PageDescriptors
     let mut count : usize = 0; // count of a continuous empty streak found
-    let num_of_descriptors = unsafe{   NUM_DP.clone()}; // number of descriptors
+    let num_of_descriptors = unsafe{  NUM_DP }; // number of descriptors
 
-    for index in (0..num_of_descriptors){ // parse all bytes while setting and resetting the count
-        let current_ptr = unsafe {base_ptr.add(index)};
-        let page_descriptor = unsafe{& *current_ptr};
-        let descriptor_val = page_descriptor.get_val();
+    for index in (0..num_of_descriptors){ // parse all Descriptors while setting and resetting the count
+        let current_ptr = unsafe {base_ptr.add(index)}; // get pointer of current descriptor
+        let current_descriptor = unsafe{& *current_ptr}; // get reference of current descriptor
+        let descriptor_val = current_descriptor.get_val();
         if descriptor_val == DescriptorValue::Empty { // if descriptor is free ...
             count = count + 1;
-            if count == req_val {   return Some(index-(req_val - 1)); }
+            if count == req_pages {   
+                println!(">>>> First empty descriptor was at index {}, Desc_addr: 0x",index-(req_pages - 1) );
+                return Some(index-(req_pages - 1)); }
         } 
         else {  count = 0; } // reset count  
     }
@@ -263,4 +499,8 @@ fn find_first_contiguous( req_val: usize) -> Option<usize>{
     return None;   
 }
 
-count
+pub fn show_layout(){
+    update_heap_page_states(); 
+    println!(">>>> Getting information about the Heap Layout.... ");
+    println!("{}", unsafe{&HEAP_LAYOUT});
+}
