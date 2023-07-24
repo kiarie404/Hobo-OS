@@ -12,7 +12,8 @@ mod drivers;
 mod asm;
 mod stdout;
 mod stdin;
-mod memory;
+mod page_manager;
+mod sv39_mmu;
 mod test_framework; 
 
 
@@ -20,6 +21,8 @@ mod test_framework;
 use core::{arch::asm, panic::PanicInfo};
 use core::fmt::Write; // enable the use of Write functions in this scope
 use stdin::continuous_keyboard_read;
+
+use crate::sv39_mmu::{map, show_mappings, unmap, translate};
 
 
 
@@ -40,29 +43,61 @@ fn panic_handler (panic_info: &PanicInfo) -> !{
 // defining the entry point function
 #[no_mangle]
 pub extern "C" fn kmain () {
-    println!("jhgjgjhg {}", 5);
-    memory::init_memory();
+    println!("You are James Kiarie {}", 5);
+    // page_manager::init_memory();
     // memory::show_layout();
 
-    let order = memory::check_descriptor_ordering();
-    if order == false { println!(">>> ordering of descriptors is messed up... ");}
+    // let order = page_manager::check_descriptor_ordering();
+    // if order == false { println!(">>> ordering of descriptors is messed up... ");}
 
-    let loc_1_address = memory::alloc(5).unwrap();
-    let loc_2_address = memory::alloc(10).unwrap();
-    memory::show_layout();
+    // let loc_1_address = page_manager::alloc(5).unwrap();
+    // let loc_2_address = page_manager::alloc(10).unwrap();
+    // page_manager::show_layout();
 
 
-    let order = memory::check_descriptor_ordering();
-    if order == false { println!(">>> ordering of descriptors is messed up... ");}
+    // let order = page_manager::check_descriptor_ordering();
+    // if order == false { println!(">>> ordering of descriptors is messed up... ");}
 
-    let dealloc_result = memory::dealloc(loc_2_address);
-    match  dealloc_result {
-        Ok(x) => /*do nothing */{},
-        Err(error) => {println!("Deallocation Error : {:?}", error);}
-    }
-    memory::show_layout();
+    // let dealloc_result = page_manager::dealloc(loc_2_address);
+    // match  dealloc_result {
+    //     Ok(x) => /*do nothing */{},
+    //     Err(error) => {println!("Deallocation Error : {:?}", error);}
+    // }
+    // page_manager::show_layout();
 
     // Run the Test functions across the entire crate
+
+    // test MMU 
+
+    page_manager::init_memory();
+    page_manager::check_descriptor_ordering();
+
+    println!("***** Allocating scace for root");
+    let root_table_address = page_manager::alloc(1).unwrap() as u64;
+    println!("****** Root table given address {:016x}",root_table_address );
+    
+    println!("***** Allocating scace for pages we want to map");
+    let phy_1 = page_manager::alloc(1).unwrap() as u64;
+    let phy_2 = page_manager::alloc(1).unwrap() as u64;
+    let phy_3 = page_manager::alloc(1).unwrap() as u64;
+    let access_map = 0b110;
+
+    println!("****** Physical pages to be mapped:  {:016x}, {:016x}, {:016x}", phy_1, phy_2, phy_3);
+
+    map(0x200000, phy_1, access_map, root_table_address);
+    map(0x201000, phy_2, access_map, root_table_address);
+    map(0x202000, phy_3, access_map, root_table_address);
+    let order = page_manager::check_descriptor_ordering();
+    if order == false { println!(">>> ordering of descriptors is messed up... ");}
+
+
+    show_mappings(root_table_address);
+    page_manager::check_descriptor_ordering();
+
+    unmap(root_table_address);
+    page_manager::check_descriptor_ordering();
+    // page_manager::show_layout();
+
     #[cfg(test)]
     test_framework_entry_point();
 

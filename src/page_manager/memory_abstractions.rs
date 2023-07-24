@@ -3,7 +3,7 @@
 //! 2. Provides functions for maniulating Pages and Descriptors
 
 use volatile_register::RW;
-use core::fmt::Display;
+use core::fmt::{Display, write};
 use core::fmt;
 
 // Abstracting the memory part
@@ -29,6 +29,18 @@ pub enum DescriptorValue{
     LastAndTaken = 0b0000_0011,
     MiddleAndTaken = 0b0000_0101,
     FirstAndLast = 0b0000_1011
+}
+
+impl Display for DescriptorValue{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self{
+            DescriptorValue::Empty => write!(f, "Empty"),
+            DescriptorValue::FirstAndLast => write!(f, "First and Last"),
+            DescriptorValue::FirstAndTaken => write!(f, "FirstAndTaken"),
+            DescriptorValue::MiddleAndTaken => write!(f, "MiddleAndTaken"),
+            DescriptorValue::LastAndTaken => write!(f, "LastAndTaken"),
+        }
+    }
 }
 
 

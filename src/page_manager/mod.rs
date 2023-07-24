@@ -1,5 +1,10 @@
 
 //! This module declares funtions that manipulate the memory abstractions
+//! More Specifically, It provides :
+//! 1. Memory initialization function
+//! 2. Page Allocation
+//! 3. Page Deallocation
+//! 4. Heap Monitoring  
 
 mod memory_abstractions;
 mod memory_errors;
@@ -34,7 +39,10 @@ fn get_heap_size() -> usize{
     return heap_memory_size;
 }
 
-/// This function uses the Page and Descriptor structs to define the actual Heap layout
+/// This function does the following:   
+/// 1. Clears the entire heap
+/// 2. Divides the heap into Segments : Descriptors and Pages   
+/// You can view the layout of the heap using the "fn show_layout()" function
 pub fn init_memory(){
     println!(">>>> Initializing memory");
     // clear memory, make every byte in the heap a zero
@@ -109,9 +117,9 @@ fn determine_heap_layout(){
     
 }
 
-// takes in the number of requested pages and returns the address of the first memory byte of the contiguous allocation
-// returns an error if requested zero pages
-// returns an error if No contiguous free space is found
+/// This function takes in the number of requested pages and returns the memory address of the first page of the contiguous page allocation     
+/// alloc() returns an error if requested zero pages    
+/// it also returns an error if No contiguous free space is found
 pub fn alloc(req_pages: usize) -> Result<usize, MemoryAllocatioErrors>{
     println!(">>>> Allocating {} Pages....", req_pages);
     // check if required pages is zero. If its zero, throw an error...
@@ -213,12 +221,13 @@ fn get_page_counts() -> (usize, usize){
     }
 }
 
-// checks if :
-    // All FirstTaken are followed by  Last, Middle,   BUT NOT Empty,  FirstTaken FirstLast
-    // All Middles are followed by LastTaken or Middle  BUT NOT empty, FirstLast, FirstTaken 
-    // All FirstLasts are followed by Empty, Flast, First BUT NOT Last, Middle, 
-    // All LastTakens are followed by Empty, First, Flast BUT NOT Last, Middle, 
-    // All Empty are followed by Empty, FirstTaken, Flast  BUT NOT Last, Middle
+/// This function checks if the Descriptors are arranged well, that their ordr is not messed up :   
+/// It makes sure that :  
+    /// All FirstTaken  Descriptorsare followed by  Last, Middle,   BUT NOT Empty,  FirstTaken FirstLast
+    /// All Middle Descriptors are followed by LastTaken or Middle  BUT NOT empty, FirstLast, FirstTaken 
+    /// All FirstLast Descriptors are followed by Empty, Flast, First BUT NOT Last, Middle, 
+    /// All LastTaken Descriptors are followed by Empty, First, Flast BUT NOT Last, Middle, 
+    /// All Empty Descriptors are followed by Empty, FirstTaken, Flast  BUT NOT Last, Middle
 pub fn check_descriptor_ordering() -> bool{
     unsafe{
         println!(">>>> Checking order of dexcriptors...");
@@ -233,6 +242,8 @@ pub fn check_descriptor_ordering() -> bool{
             let next_desc_ref = & *next_desc_ptr;
             let next_desc_val = next_desc_ref.get_val();
 
+            let p_address = get_page_addr_from_page_index(index);
+            // println!(">>>> Checking address: {:016x} : {} <> referencing address : {:016x}",current_desc_ptr as usize, current_desc_val, p_address);
             // deal with FirstTakens
             match current_desc_val {
                 DescriptorValue::FirstAndTaken => {
@@ -241,7 +252,8 @@ pub fn check_descriptor_ordering() -> bool{
                         DescriptorValue::FirstAndLast => return false,
                         DescriptorValue::MiddleAndTaken => {/* do nothing */},
                         DescriptorValue::LastAndTaken => {/* do nothing */},
-                        DescriptorValue::Empty => return false
+                        DescriptorValue::Empty => return false,
+                        _ => return false
                     }
                 },
 
@@ -251,7 +263,8 @@ pub fn check_descriptor_ordering() -> bool{
                         DescriptorValue::FirstAndLast => {/* do nothing */},
                         DescriptorValue::MiddleAndTaken => return false,
                         DescriptorValue::LastAndTaken => return false,
-                        DescriptorValue::Empty => {/* do nothing */}
+                        DescriptorValue::Empty => {/* do nothing */},
+                        _ => return false
                     }
                 },
 
@@ -261,7 +274,8 @@ pub fn check_descriptor_ordering() -> bool{
                         DescriptorValue::FirstAndLast => return false,
                         DescriptorValue::MiddleAndTaken => {/* do nothing */},
                         DescriptorValue::LastAndTaken => {/* do nothing */},
-                        DescriptorValue::Empty => return false
+                        DescriptorValue::Empty => return false,
+                        _ => return false
                     }
                 },
 
@@ -271,7 +285,8 @@ pub fn check_descriptor_ordering() -> bool{
                         DescriptorValue::FirstAndLast => {/* do nothing */},
                         DescriptorValue::MiddleAndTaken => return false,
                         DescriptorValue::LastAndTaken => return false,
-                        DescriptorValue::Empty => {/* do nothing */}
+                        DescriptorValue::Empty => {/* do nothing */},
+                        _ => return false
                     }
                 },
 
@@ -281,7 +296,8 @@ pub fn check_descriptor_ordering() -> bool{
                         DescriptorValue::FirstAndLast => {/* do nothing */},
                         DescriptorValue::MiddleAndTaken => return false,
                         DescriptorValue::LastAndTaken => return false,
-                        DescriptorValue::Empty => {/* do nothing */}
+                        DescriptorValue::Empty => {/* do nothing */},
+                        _ => return false
                     }
                 },
             }
@@ -490,7 +506,7 @@ fn find_first_contiguous( req_pages: usize) -> Option<usize>{
         if descriptor_val == DescriptorValue::Empty { // if descriptor is free ...
             count = count + 1;
             if count == req_pages {   
-                println!(">>>> First empty descriptor was at index {}, Desc_addr: 0x",index-(req_pages - 1) );
+                println!(">>>> First empty descriptor was at index {}",index-(req_pages - 1) );
                 return Some(index-(req_pages - 1)); }
         } 
         else {  count = 0; } // reset count  
@@ -499,6 +515,8 @@ fn find_first_contiguous( req_pages: usize) -> Option<usize>{
     return None;   
 }
 
+/// This fuction displays the current state of the Heap.  
+/// You can use this information to debug the Heap iitialization, allocation and deallocatio
 pub fn show_layout(){
     update_heap_page_states(); 
     println!(">>>> Getting information about the Heap Layout.... ");

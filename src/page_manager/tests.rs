@@ -4,9 +4,9 @@ use crate::{print, println};
 #[test_case]
 fn page_allocation_test_runner(){
     println!("\n---------  Running Page Allocation tests  ---------\n");
-    fake_test_1();
-    fake_test_2();
-    //fake_test_2(); // This is how you filter certain tests
+   //  fake_test_1();
+   //  fake_test_2();
+   //fake_test_2(); // This is how you filter certain tests
 
 }
 
