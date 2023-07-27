@@ -15,6 +15,7 @@ mod stdin;
 mod page_manager;
 mod sv39_mmu;
 mod test_framework; 
+mod map_kernel;
 
 
 // usage of accessible modules
@@ -69,34 +70,44 @@ pub extern "C" fn kmain () {
 
     // test MMU 
 
-    page_manager::init_memory();
-    page_manager::check_descriptor_ordering();
+    // page_manager::init_memory();
+    // page_manager::check_descriptor_ordering();
 
-    println!("***** Allocating scace for root");
-    let root_table_address = page_manager::alloc(1).unwrap() as u64;
-    println!("****** Root table given address {:016x}",root_table_address );
+    // println!("***** Allocating scace for root");
+    // let root_table_address = page_manager::alloc(1).unwrap() as u64;
+    // println!("****** Root table given address {:016x}",root_table_address );
     
-    println!("***** Allocating scace for pages we want to map");
-    let phy_1 = page_manager::alloc(1).unwrap() as u64;
-    let phy_2 = page_manager::alloc(1).unwrap() as u64;
-    let phy_3 = page_manager::alloc(1).unwrap() as u64;
-    let access_map = 0b110;
+    // println!("***** Allocating scace for pages we want to map");
+    // let phy_1 = page_manager::alloc(1).unwrap() as u64;
+    // let phy_2 = page_manager::alloc(1).unwrap() as u64;
+    // let phy_3 = page_manager::alloc(1).unwrap() as u64;
+    // let access_map = 0b110;
 
-    println!("****** Physical pages to be mapped:  {:016x}, {:016x}, {:016x}", phy_1, phy_2, phy_3);
+    // println!("****** Physical pages to be mapped:  {:016x}, {:016x}, {:016x}", phy_1, phy_2, phy_3);
 
-    map(0x200000, phy_1, access_map, root_table_address);
-    map(0x201000, phy_2, access_map, root_table_address);
-    map(0x202000, phy_3, access_map, root_table_address);
-    let order = page_manager::check_descriptor_ordering();
-    if order == false { println!(">>> ordering of descriptors is messed up... ");}
+    // map(0x200000, phy_1, access_map, root_table_address);
+    // map(0x201000, phy_2, access_map, root_table_address);
+    // map(0x202000, phy_3, access_map, root_table_address);
+    // let order = page_manager::check_descriptor_ordering();
+    // if order == false { println!(">>> ordering of descriptors is messed up... ");}
 
 
-    show_mappings(root_table_address);
-    page_manager::check_descriptor_ordering();
+    // show_mappings(root_table_address);
+    // page_manager::check_descriptor_ordering();
 
-    unmap(root_table_address);
-    page_manager::check_descriptor_ordering();
-    // page_manager::show_layout();
+    // unmap(root_table_address);
+    // page_manager::check_descriptor_ordering();
+    // // page_manager::show_layout();
+
+    // ---- testing Kernel Mapping -----// 
+    page_manager::init_memory();
+    let kernel_root_table_address = page_manager::alloc(1).unwrap();
+
+        // identity mapping
+        map_kernel::identity_map_kernel(kernel_root_table_address);
+
+        // proof by showing the mappings
+        sv39_mmu::show_mappings(kernel_root_table_address as u64);
 
     #[cfg(test)]
     test_framework_entry_point();

@@ -24,7 +24,7 @@ PHDRS
 
 SECTIONS
 {
-  
+  . = ALIGN(4096);
   .text : {
 	 
 
@@ -38,7 +38,9 @@ SECTIONS
   } >ram AT>ram :text
    
    PROVIDE(_global_pointer = .);
-   
+
+  
+  . = ALIGN(4096);
   .rodata : {
     PROVIDE(_rodata_start = .);
     *(.rodata .rodata.*)
@@ -55,6 +57,7 @@ SECTIONS
     PROVIDE(_data_end = .);
   } >ram AT>ram :data
 
+  . = ALIGN(4096);
   .bss : {
     PROVIDE(_bss_start = .);
     *(.sbss .sbss.*) *(.bss .bss.*)
@@ -64,10 +67,12 @@ SECTIONS
   
   PROVIDE(_memory_start = ORIGIN(ram));
   
-  PROVIDE(_stack_start = _bss_end);
+  . = _bss_end;
+  . = ALIGN(4096);
+  PROVIDE(_stack_start = .);
 
   . = _stack_start;
-  . = . + 0x80000;
+  . = . + 0x80000; /* The STACK is 512 KB */
 
   PROVIDE(_stack_end = .);
   PROVIDE(_memory_end = ORIGIN(ram) + LENGTH(ram));
