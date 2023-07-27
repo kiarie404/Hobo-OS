@@ -42,9 +42,11 @@ fn panic_handler (panic_info: &PanicInfo) -> !{
 
 
 // defining the entry point function
+// kinit returns the satp value .  
+// this value gets used to update the satp register before executing kmain
 #[no_mangle]
-pub extern "C" fn kmain () {
-    println!("You are James Kiarie {}", 5);
+pub extern "C" fn kinit () {
+    println!("I am in Machine mode...");
     // page_manager::init_memory();
     // memory::show_layout();
 
@@ -103,16 +105,29 @@ pub extern "C" fn kmain () {
     page_manager::init_memory();
     let kernel_root_table_address = page_manager::alloc(1).unwrap();
 
-        // identity mapping
-        map_kernel::identity_map_kernel(kernel_root_table_address);
+    // identity mapping
+    map_kernel::identity_map_kernel(kernel_root_table_address);
 
-        // proof by showing the mappings
-        sv39_mmu::show_mappings(kernel_root_table_address as u64);
+    // proof by showing the mappings
+    sv39_mmu::show_mappings(kernel_root_table_address as u64);
 
-    #[cfg(test)]
-    test_framework_entry_point();
+    // mode : sv39
+    // ASID : 0
+    // address : kernel_root_table_address
+    let satp_value: usize = 0usize | (8 << 60) | (kernel_root_table_address >> 12);
+    println!("Satp Value: {}", satp_value);
+    // return satp_value;
+
+    // #[cfg(test)]
+    // test_framework_entry_point();
 
     // continuous_keyboard_read();
+}
+
+
+#[no_mangle]
+pub extern "C" fn kmain(){
+    println!("Hello world, I am in supervisor mode!!!");
 }
 
 

@@ -64,7 +64,7 @@ pub fn map(virt_address: u64, physical_address: u64, access_map: u64, root_table
                 }
                 else { // make that table entry to point at a valid Page Table
                     let new_table = page_manager::alloc(1).expect("unable to allocate a Page for the Mid Table") as u64;
-                    println!("***** Mid table was given the address : {:016x}",new_table );
+                    // println!("***** Mid table was given the address : {:016x}",new_table );
                     root_table_entry.set_address(new_table);
                     root_table_entry.set_as_valid();
                     mid_table_address = new_table;
@@ -83,7 +83,7 @@ pub fn map(virt_address: u64, physical_address: u64, access_map: u64, root_table
                 }
                 else { // make that table entry to point at a valid Page Table ie. Leaf Page Table
                     let new_table = page_manager::alloc(1).expect("unable to allocate a Page for the Leaf Table") as u64;
-                    println!("***** Leaf table was given the address : {:016x}",new_table );
+                    // println!("***** Leaf table was given the address : {:016x}",new_table );
                     mid_table_entry.set_address(new_table);
                     mid_table_entry.set_as_valid();
                     leaf_table_address = new_table;
@@ -292,7 +292,7 @@ pub fn show_mappings(root_table_address: u64){
                         else { // print the physical address being referenced 
                            let combined_virt_address = (virt_address_root << 30) | (virt_address_mid << 21) | (virt_address_leaf << 12);
                            let physical_address = leaf_table_entry.get_address();
-                           println!("{:016x} : {:016x}", combined_virt_address, physical_address);
+                        //    println!(" ***** {:016x} : {:016x}", combined_virt_address, physical_address);
                         }
                     }
 

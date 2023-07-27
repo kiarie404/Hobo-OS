@@ -121,7 +121,7 @@ fn determine_heap_layout(){
 /// alloc() returns an error if requested zero pages    
 /// it also returns an error if No contiguous free space is found
 pub fn alloc(req_pages: usize) -> Result<usize, MemoryAllocatioErrors>{
-    println!(">>>> Allocating {} Pages....", req_pages);
+    // println!(">>>> Allocating {} Pages....", req_pages);
     // check if required pages is zero. If its zero, throw an error...
     if req_pages == 0 { return Err(MemoryAllocatioErrors::ZeroPagesRequested("Zero pages were requested from the allocator"));}
     else { // traverse the array of descriptors, lookng for a contiguous free space
@@ -253,7 +253,6 @@ pub fn check_descriptor_ordering() -> bool{
                         DescriptorValue::MiddleAndTaken => {/* do nothing */},
                         DescriptorValue::LastAndTaken => {/* do nothing */},
                         DescriptorValue::Empty => return false,
-                        _ => return false
                     }
                 },
 
@@ -264,7 +263,6 @@ pub fn check_descriptor_ordering() -> bool{
                         DescriptorValue::MiddleAndTaken => return false,
                         DescriptorValue::LastAndTaken => return false,
                         DescriptorValue::Empty => {/* do nothing */},
-                        _ => return false
                     }
                 },
 
@@ -275,7 +273,6 @@ pub fn check_descriptor_ordering() -> bool{
                         DescriptorValue::MiddleAndTaken => {/* do nothing */},
                         DescriptorValue::LastAndTaken => {/* do nothing */},
                         DescriptorValue::Empty => return false,
-                        _ => return false
                     }
                 },
 
@@ -286,7 +283,6 @@ pub fn check_descriptor_ordering() -> bool{
                         DescriptorValue::MiddleAndTaken => return false,
                         DescriptorValue::LastAndTaken => return false,
                         DescriptorValue::Empty => {/* do nothing */},
-                        _ => return false
                     }
                 },
 
@@ -297,7 +293,6 @@ pub fn check_descriptor_ordering() -> bool{
                         DescriptorValue::MiddleAndTaken => return false,
                         DescriptorValue::LastAndTaken => return false,
                         DescriptorValue::Empty => {/* do nothing */},
-                        _ => return false
                     }
                 },
             }
@@ -506,7 +501,7 @@ fn find_first_contiguous( req_pages: usize) -> Option<usize>{
         if descriptor_val == DescriptorValue::Empty { // if descriptor is free ...
             count = count + 1;
             if count == req_pages {   
-                println!(">>>> First empty descriptor was at index {}",index-(req_pages - 1) );
+                // println!(">>>> First empty descriptor was at index {}",index-(req_pages - 1) );
                 return Some(index-(req_pages - 1)); }
         } 
         else {  count = 0; } // reset count  
