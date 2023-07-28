@@ -5,6 +5,7 @@
 use core::arch::global_asm;
 
 // global_asm!(include_str!("boot_copy.s"));
+// include_str! macro takes in a file and outputs a &'static str
 global_asm!(include_str!("booze.s"));
 // global_asm!(include_str!("boot.s"));
 global_asm!(include_str!("trap.s"));

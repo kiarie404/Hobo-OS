@@ -16,6 +16,7 @@ mod page_manager;
 mod sv39_mmu;
 mod test_framework; 
 mod map_kernel;
+mod riscv;
 
 
 // usage of accessible modules
@@ -25,6 +26,8 @@ use stdin::continuous_keyboard_read;
 
 use crate::sv39_mmu::{map, show_mappings, unmap, translate};
 
+static mut kernel_satp_value_gl: usize = 0;
+static mut kernel_root_table_address_gl : usize = 0;
 
 
 // defining the function that will always get called after a panic
@@ -47,87 +50,59 @@ fn panic_handler (panic_info: &PanicInfo) -> !{
 #[no_mangle]
 pub extern "C" fn kinit () {
     println!("I am in Machine mode...");
-    // page_manager::init_memory();
-    // memory::show_layout();
-
-    // let order = page_manager::check_descriptor_ordering();
-    // if order == false { println!(">>> ordering of descriptors is messed up... ");}
-
-    // let loc_1_address = page_manager::alloc(5).unwrap();
-    // let loc_2_address = page_manager::alloc(10).unwrap();
-    // page_manager::show_layout();
+    // You can access both mstatus and sstatus because you are in machine mode
+    let mstatus_value = riscv::mstatus_read();
+    let sstatus_value = riscv::sstatus_read();
+    println!("mstatus : {:b}", mstatus_value);
+    println!("sstatus : {:b}", sstatus_value);
 
 
-    // let order = page_manager::check_descriptor_ordering();
-    // if order == false { println!(">>> ordering of descriptors is messed up... ");}
-
-    // let dealloc_result = page_manager::dealloc(loc_2_address);
-    // match  dealloc_result {
-    //     Ok(x) => /*do nothing */{},
-    //     Err(error) => {println!("Deallocation Error : {:?}", error);}
-    // }
-    // page_manager::show_layout();
-
-    // Run the Test functions across the entire crate
-
-    // test MMU 
-
-    // page_manager::init_memory();
-    // page_manager::check_descriptor_ordering();
-
-    // println!("***** Allocating scace for root");
-    // let root_table_address = page_manager::alloc(1).unwrap() as u64;
-    // println!("****** Root table given address {:016x}",root_table_address );
-    
-    // println!("***** Allocating scace for pages we want to map");
-    // let phy_1 = page_manager::alloc(1).unwrap() as u64;
-    // let phy_2 = page_manager::alloc(1).unwrap() as u64;
-    // let phy_3 = page_manager::alloc(1).unwrap() as u64;
-    // let access_map = 0b110;
-
-    // println!("****** Physical pages to be mapped:  {:016x}, {:016x}, {:016x}", phy_1, phy_2, phy_3);
-
-    // map(0x200000, phy_1, access_map, root_table_address);
-    // map(0x201000, phy_2, access_map, root_table_address);
-    // map(0x202000, phy_3, access_map, root_table_address);
-    // let order = page_manager::check_descriptor_ordering();
-    // if order == false { println!(">>> ordering of descriptors is messed up... ");}
-
-
-    // show_mappings(root_table_address);
-    // page_manager::check_descriptor_ordering();
-
-    // unmap(root_table_address);
-    // page_manager::check_descriptor_ordering();
-    // // page_manager::show_layout();
-
-    // ---- testing Kernel Mapping -----// 
+    // initialize memory
     page_manager::init_memory();
+
+    // get kernel_root_table
     let kernel_root_table_address = page_manager::alloc(1).unwrap();
 
-    // identity mapping
+    // identity map the kernel address space
     map_kernel::identity_map_kernel(kernel_root_table_address);
 
-    // proof by showing the mappings
+    // show that the mappings are okay
     sv39_mmu::show_mappings(kernel_root_table_address as u64);
 
-    // mode : sv39
-    // ASID : 0
-    // address : kernel_root_table_address
-    let satp_value: usize = 0usize | (8 << 60) | (kernel_root_table_address >> 12);
-    println!("Satp Value: {}", satp_value);
-    // return satp_value;
+    // show that translation works
+    let virt_uart_address = 0x1000_0000;
+    let physical_uart_address = sv39_mmu::translate(kernel_root_table_address as u64, virt_uart_address).unwrap();
+    println!("Uart Address : {:016x}", physical_uart_address);
 
-    // #[cfg(test)]
-    // test_framework_entry_point();
+    // update the kernel satp value and kernel root table address global
+    unsafe{
+        kernel_satp_value_gl = 0usize | (8 << 60) | (kernel_root_table_address >> 12);
+        kernel_root_table_address_gl =  kernel_root_table_address;
+    }
 
-    // continuous_keyboard_read();
+
 }
 
 
 #[no_mangle]
 pub extern "C" fn kmain(){
-    println!("Hello world, I am in supervisor mode!!!");
+    // Show that we are in supervisor mode
+        println!("Hello world, I am in supervisor mode!!!");
+        // let mstatus_value = riscv::mstatus_read();    // WILL NOT WORK BECAUSE WE ARE IN SUPERVISOR MODE
+        let sstatus_value = riscv::sstatus_read();
+        // println!("mstatus : {:b}", mstatus_value);   // WILL NOT WORK 
+        println!("sstatus : {:b}", sstatus_value);
+
+    // Access the kernel_root_table_address and satp value
+    let kernel_root_table_address = unsafe {kernel_root_table_address_gl};
+    let kernel_satp_value = unsafe {kernel_satp_value_gl};
+
+    // Show that we can still translate addresses 
+        let virt_uart_address = 0x1000_0000;
+        let physical_uart_address = sv39_mmu::translate(kernel_root_table_address as u64, virt_uart_address).unwrap();
+        println!("Uart Address : {:016x}", physical_uart_address);
+
+
 }
 
 

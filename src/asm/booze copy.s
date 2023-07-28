@@ -85,67 +85,71 @@ _clear_BSS_section_loop:
 
 _initialize_registers_for_kinit:
     la		sp, _stack_end                          # setup the stack pointer
-    li		t0, (0b11 << 11) | (0 << 7) | (0 << 3)  # Set MPP field to 11 (Machine Mode), kinit will execute in Machine mode
-                                                    # Bit 7, sets MPIE bit to 0 ; once we get into kinit, we will not need any interference
-                                                    # Bit 3, Sets the MIE bit to 0 ; '_initialize_registers_for_kinit' does not need interference 
+    li		t0, (0b11 << 11) | (0 << 7) | (0 << 3)  # Set MPP field to 11 (Machine Mode), 
+                                                    # Bit 7, sets MPIE bit to 0 ; meaning interrupts from lower levels can get handled by machine mode if invoked
+                                                    # Bit 3, Sets the MIE bit to 1 ; meaning the CPU can receive interrups while in machine mode
     csrw	mstatus, t0
 
-    # set kinit to be the value that will be pasted tp the PC counter after calling mret
+    # set kmain to be the value that will be pasted tp the PC counter after calling mret
     la		t1, kinit
 	csrw	mepc, t1   
 
-    # set the Machine trap vector
+    #set the Machine trap vector
     la		t2, asm_trap_vector
 	csrw	mtvec, t2  
 
-    #  set the return address to point to the address of the  "_initialize_registers_for_kmain" code. After kinit does its thing, it goes to this place
+    # allow specific interrupts
+    # 3 == Software Interrupts, 7 == Timer Interrupts, 11 == External Interrupts
+    # li		t3, (1 << 1) | (1 << 3) | (1 << 5) | (1 << 7) | (1 << 9) | (1 << 11) 
+	# csrw	mie, t3
+
+    #  set the return address to point to the address of the  "_initialize_registers_for_kmain" code
     la      ra, _initialize_environment_for_kmain
 
     # call kmain (indirectly, this is because mret will make the cpu program counter to point to the value in mepc(kmain))
     mret
-    # mret makes PC point to mepc(kinit)
-    # sets MIE to value in the MPIE 
-    # sets MPIE to the previous 1
-    # sets the CPU priviledge mode to mstatus.mpp
 
 _initialize_environment_for_kmain:
     # this code is meant to prepare the CPU to execute the kernel in supervisor mode
     # registers like the global pointer, stackpointer can remain the way they are
 
-    # set the mstatus register, prepare it to skip to supervisor mode
-    li      t0, (0b01 << 11)|(1 << 7)|(1 << 5)
-    csrw    mstatus, t0 
+    # set the sstatus register
+    # 1 << 8    : Supervisor's previous protection mode is 1 (SPP=1 [Supervisor]).
+	# 1 << 5    : Supervisor's previous interrupt-enable bit is 1 (SPIE=1 [Enabled]).
+	# 1 << 1    : Supervisor's interrupt-enable bit [Enabled]
+    li      t0, (1 << 8)|(1 << 5)|(1 << 1)
+    csrw    sstatus, t0 
 
 
-    # Enable All Interrupts. All interrupts will be handled by the Machine mode
-    li t3, 0b1111111111111111
-    csrw mie, t3
+    li        t1, (1 << 1)| (1 << 5)| (1 << 9)
+    # csrw      sie, t1 
+    csrw      mideleg, t1 
 
     # Enable all exceptions by setting all of th 16 bits of medeleg to 1
     # Now all exceptions that happen in bot Supervisor and Usermode will be handled in Superisor mode
-    # li      t2, (1 << 1)| (1 << 5) | (1 << 9)
+    li      t2, (1 << 1)| (1 << 5) | (1 << 9)
     # csrw    medeleg, t2 
 
     # Set the stvec register
     # in our case, the stvec will still point to the address of the vector that was called  while we were in machine mode
     # It's the same thing. The code in it was not Machine-mode-specific
     la      t0, asm_trap_vector
-    csrw    mtvec, t0  
+    csrw    stvec, t0  
 
     # Define the start point of kernel 
     la      t0, kmain
-    csrw    mepc, t0
+    csrw    sepc, t0
     
     # Update the value in the satp. The satp value was returned by kinit() via register a0
-    # sfence.vma 
-    # csrw    satp, a0 
-    # sfence.vma 
+    sfence.vma 
+    csrw    satp, a0 
+    sfence.vma 
     # force the CPU to use a fresh satp and corresponding translation tables. This instruction tells the CPU :
     # "Do not use cached information, use new and up-to-date information. Refresh things"
     # What sfence.vma does in the backgroud is to fulfill all "write" operations that are pending. Our ain is to make sure
     # that the above instruction "csrw satp, a0" gets completed before calling sret
 
-    mret
+    sret
     
 
 
