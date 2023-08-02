@@ -135,6 +135,7 @@ _initialize_environment_for_kmain:
     # Define the start point of kernel 
     la      t0, kmain
     csrw    mepc, t0
+    la      ra, _make_HART_sleep
     
     # Update the value in the satp. The satp value was returned by kinit() via register a0
     # sfence.vma 

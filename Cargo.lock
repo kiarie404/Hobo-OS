@@ -3,7 +3,7 @@
 version = 3
 
 [[package]]
-name = "os"
+name = "hobo_os"
 version = "0.1.0"
 dependencies = [
  "volatile-register",

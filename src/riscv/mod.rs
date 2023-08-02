@@ -86,6 +86,32 @@ pub fn mtvec_read() -> usize{
     }
 }
 
+/// This function reads the value contained in the mcause register and returns the value
+pub fn mcause_read() -> usize{
+    unsafe{
+        let value: u64;
+        asm!("csrr  {}, mcause", out(reg) value);
+        return value as usize;
+    }
+}
+
+/// This function reads the value contained in the mie register and returns the value
+pub fn mie_read() -> usize{
+    unsafe{
+        let value: u64;
+        asm!("csrr  {}, mie", out(reg) value);
+        return value as usize;
+    }
+}
+
+/// This function reads the value contained in the mtval register and returns the value
+pub fn mtval_read() -> usize{
+    unsafe{
+        let value: u64;
+        asm!("csrr  {}, mtval", out(reg) value);
+        return value as usize;
+    }
+}
 
 // ------------ Writing Functions ----------------------- //
 pub fn mscratch_write(val: u64){
@@ -135,4 +161,10 @@ pub fn clear_TLB(){
     unsafe{
         asm!("sfence.vma");
     }
+}
+
+
+// ----------- control functions -------------------------------- //
+pub fn call_mret(){
+    unsafe {asm!("mret")};
 }

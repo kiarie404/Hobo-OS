@@ -1,5 +1,5 @@
 [package]
-name = "os"
+name = "hobo_os"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,9 +10,12 @@ edition = "2021"
 
 [profile.release]
 panic = "abort"
+debug = true
+
 
 [profile.dev]
 panic = "abort"
+debug = true
 
 [dependencies]
 volatile-register = "0.2.1"
