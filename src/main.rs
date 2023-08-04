@@ -120,7 +120,7 @@ pub extern "C" fn kinit () {
 pub extern "C" fn kmain() -> (){
     // Show that we are in supervisor mode
         println!("Hello world, I am in supervisor mode!!!");
-        let mstatus_value = riscv::mstatus_read();    // WILL NOT WORK BECAUSE WE ARE IN SUPERVISOR MODE
+        // let mstatus_value = riscv::mstatus_read();    // WILL NOT WORK BECAUSE WE ARE IN SUPERVISOR MODE
     //     let sstatus_value = riscv::sstatus_read();
     //     // println!("mstatus : {:b}", mstatus_value);   // WILL NOT WORK 
     //     println!("sstatus : {:b}", sstatus_value);
@@ -147,6 +147,7 @@ pub extern "C" fn kmain() -> (){
 
     // let trap_frame_address = riscv::mscratch_read();
     // println!("See the error did not stop the program flow");
+    unsafe{ asm!("ecall")};
     println!("hahaha, I am going to shut down.... see you later.");
     return ();
 }

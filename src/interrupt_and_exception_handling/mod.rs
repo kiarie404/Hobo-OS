@@ -49,9 +49,9 @@ pub extern "C" fn rust_trap_handler()-> usize{
 
 
     // change the stack pointer to point to the floor of the trapstack
-    let trap_stack_floor_memory_ptr = (&mut trap_frame_ref.trap_stack[9]) as *mut usize;
-    let trap_stack_floor_memory_address = trap_stack_floor_memory_ptr as usize; 
-    unsafe { asm!("mv  sp, {}", in(reg)trap_stack_floor_memory_address)};
+    // let trap_stack_floor_memory_ptr = (&mut trap_frame_ref.trap_stack[9]) as *mut usize;
+    // let trap_stack_floor_memory_address = trap_stack_floor_memory_ptr as usize; 
+    // unsafe { asm!("mv  sp, {}", in(reg)trap_stack_floor_memory_address)};
 
 
     // check if disturbance was an exception or interrupt
@@ -63,8 +63,16 @@ pub extern "C" fn rust_trap_handler()-> usize{
         return trap_frame_ref.mepc;
        }
     else{   
-         let instruction_after_cause_address = exceptions::handle_exception(trap_frame_ref);
-         return instruction_after_cause_address;
+         let exception_handling_result = exceptions::handle_exception(trap_frame_ref);
+         match exception_handling_result {
+            Ok(address) => {    return address;  },
+            Err(exception_handling_error) => {
+                println!("Exeption Handling Error Occurred : {:?}", exception_handling_error);
+                println!("Kernel will shut down");
+                riscv::cpu_shutdown();
+                return 0;
+            }
+         }
     }
 
     // restore the values of the trapframe... before calling mret

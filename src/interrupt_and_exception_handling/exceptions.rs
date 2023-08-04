@@ -1,5 +1,6 @@
 use super::TrapFrame;
 use crate::{print, println};
+use core::arch::asm;
 use crate::riscv;
 
 #[derive(Debug, Clone, Copy)]
@@ -21,7 +22,12 @@ pub enum ExceptionType{
     UnknownSync(usize), // unassigned/ custom
 }
 
-pub fn handle_exception(trapframe: &mut TrapFrame) -> usize{
+#[derive(Debug, Clone, Copy)]
+pub enum ExceptionHandlingError{
+    UnableToRecoverFromException
+}
+
+pub fn handle_exception(trapframe: &mut TrapFrame) -> Result<usize, ExceptionHandlingError>{
     // get cause
     let cause = trapframe.mcause & !(1 << 63);
 
@@ -29,75 +35,64 @@ pub fn handle_exception(trapframe: &mut TrapFrame) -> usize{
     match cause {
         0   => {
             println!("Handling InstructionAddressMisaligned");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            return Err(ExceptionHandlingError::UnableToRecoverFromException);  
         },
         1   => {
             println!("Handling InstructionAccessFault");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            return Err(ExceptionHandlingError::UnableToRecoverFromException);  
         },
 
         2   => {
             println!("Handling IllegalInstruction : {}", trapframe.mepc);
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            return Err(ExceptionHandlingError::UnableToRecoverFromException);
         },
 
         3   => {
             println!("Handling Breakpoint");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            let next_nonfaulty_instruction = trapframe.mepc + 4; // $ra + 4
+            return Ok(next_nonfaulty_instruction);
         },
         4   => {
             println!("Handling LoadAddressMisaligned");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            return Err(ExceptionHandlingError::UnableToRecoverFromException); 
         },
         5   => {
             println!("Handling LoadAccessFault");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            return Err(ExceptionHandlingError::UnableToRecoverFromException); 
         },
         6   => {
             println!("Handling StoreAddressMisaligned");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            return Err(ExceptionHandlingError::UnableToRecoverFromException);
         },
         7   => {
             println!("Handling StoreAccessFault");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            return Err(ExceptionHandlingError::UnableToRecoverFromException);
         },
         8   => {
             println!("Handling UserEnvironmentCall");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            let next_nonfaulty_instruction = trapframe.regs[1] + 4; // $ra + 4
+            return Ok(next_nonfaulty_instruction);
         },
         9   => {
             println!("Handling SupervisorEnvironmentCall");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            let next_nonfaulty_instruction = trapframe.regs[1] + 4; // $ra + 4
+            return Ok(next_nonfaulty_instruction);
         },
         11   => {
             println!("Handling MachineEnvironmentCall");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            return Err(ExceptionHandlingError::UnableToRecoverFromException);
         },
         12   => {
             println!("Handling InstructionPageFault");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            return Err(ExceptionHandlingError::UnableToRecoverFromException);
         },
         13   => {
             println!("Handling LoadPageFault");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            return Err(ExceptionHandlingError::UnableToRecoverFromException);
         },
         15   => {
             println!("Handling StorePageFault");
-            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
-            return next_doable_instruction;
+            return Err(ExceptionHandlingError::UnableToRecoverFromException);
         },
 
         _   => {    panic!("Unhandled exception trap cause -> {}\n", cause);  }

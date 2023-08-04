@@ -168,3 +168,11 @@ pub fn clear_TLB(){
 pub fn call_mret(){
     unsafe {asm!("mret")};
 }
+
+pub fn cpu_shutdown(){
+    unsafe{
+        loop{
+            asm!("wfi");
+        }
+    }
+}
