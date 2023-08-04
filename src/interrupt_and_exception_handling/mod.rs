@@ -15,14 +15,14 @@ pub struct TrapFrame{
     pub regs : [usize; 32],
     pub fregs: [usize; 32],
     // control status registers 
-    pub satp : usize,
-    pub mstatus : usize,
-    pub mepc : usize,
-    pub mie : usize,
-    pub mcause : usize,
-    pub mtval : usize,
+    pub satp : usize,  // 512
+    pub mstatus : usize, // 520
+    pub mepc : usize, // 528
+    pub mie : usize, // 536
+    pub mcause : usize, // 544
+    pub mtval : usize, // 552
     // trap stack 
-    pub trap_stack : [usize; 10]
+    pub trap_stack : [usize; 10] // [560 - 567]
 }
 
 impl TrapFrame {
@@ -37,20 +37,16 @@ impl TrapFrame {
                     mtval:    0,
                     trap_stack:    [0; 10],
                  }
-	}
+   }
 }
 
 
-
 #[no_mangle]
-pub extern "C" fn rust_trap(){
+pub extern "C" fn rust_trap_handler()-> usize{
 
     println!("I am in rust trap handler");
     let trap_frame_ref = unsafe{ &mut kernel_trap_frame};
 
-    // save the regs in the trapframe
-    save_integer_registers( trap_frame_ref);
-    save_csr_registers( trap_frame_ref);
 
     // change the stack pointer to point to the floor of the trapstack
     let trap_stack_floor_memory_ptr = (&mut trap_frame_ref.trap_stack[9]) as *mut usize;
@@ -62,8 +58,14 @@ pub extern "C" fn rust_trap(){
     let was_interrupt = check_if_interrupt(trap_frame_ref);
 
     // Handle the exception or interrupt
-    if was_interrupt == true {    interrupts::handle_interrupt(trap_frame_ref);    }
-    else{    exceptions::handle_exception(trap_frame_ref);    }
+    if was_interrupt == true {    
+        interrupts::handle_interrupt(trap_frame_ref); 
+        return trap_frame_ref.mepc;
+       }
+    else{   
+         let instruction_after_cause_address = exceptions::handle_exception(trap_frame_ref);
+         return instruction_after_cause_address;
+    }
 
     // restore the values of the trapframe... before calling mret
     // restore_integer_registers(trap_frame_ref);

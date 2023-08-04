@@ -1,5 +1,6 @@
 use super::TrapFrame;
 use crate::{print, println};
+use crate::riscv;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ExceptionType{
@@ -20,7 +21,7 @@ pub enum ExceptionType{
     UnknownSync(usize), // unassigned/ custom
 }
 
-pub fn handle_exception(trapframe: &mut TrapFrame){
+pub fn handle_exception(trapframe: &mut TrapFrame) -> usize{
     // get cause
     let cause = trapframe.mcause & !(1 << 63);
 
@@ -28,61 +29,75 @@ pub fn handle_exception(trapframe: &mut TrapFrame){
     match cause {
         0   => {
             println!("Handling InstructionAddressMisaligned");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
         1   => {
             println!("Handling InstructionAccessFault");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
 
         2   => {
             println!("Handling IllegalInstruction : {}", trapframe.mepc);
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
 
         3   => {
             println!("Handling Breakpoint");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
         4   => {
             println!("Handling LoadAddressMisaligned");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
         5   => {
             println!("Handling LoadAccessFault");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
         6   => {
             println!("Handling StoreAddressMisaligned");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
         7   => {
             println!("Handling StoreAccessFault");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
         8   => {
             println!("Handling UserEnvironmentCall");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
         9   => {
             println!("Handling SupervisorEnvironmentCall");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
         11   => {
             println!("Handling MachineEnvironmentCall");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
         12   => {
             println!("Handling InstructionPageFault");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
         13   => {
             println!("Handling LoadPageFault");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
         15   => {
             println!("Handling StorePageFault");
-            trapframe.mepc += 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            let next_doable_instruction = trapframe.mepc + 4; // add 32 bits, so as to point to the istruction that comes after the exception-causing instruction
+            return next_doable_instruction;
         },
 
         _   => {    panic!("Unhandled exception trap cause -> {}\n", cause);  }

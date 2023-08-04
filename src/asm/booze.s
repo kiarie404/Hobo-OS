@@ -110,7 +110,9 @@ _initialize_registers_for_kinit:
 
 _initialize_environment_for_kmain:
     # this code is meant to prepare the CPU to execute the kernel in supervisor mode
-    # registers like the global pointer, stackpointer can remain the way they are
+    # registers like the global pointer, stackpointer, threadpointer can remain the way they are
+    # However, the return address, will point to "Shutdown". Shutdown in this case means making the HART sleep endlessly.
+    # I currently do not know how to make a CPU to shut down for Real real. Truly shutting down looks like dark magic. Magic that will be learned another time
 
     # set the mstatus register, prepare it to skip to supervisor mode
     li      t0, (0b01 << 11)|(1 << 7)|(1 << 5)
@@ -135,7 +137,7 @@ _initialize_environment_for_kmain:
     # Define the start point of kernel 
     la      t0, kmain
     csrw    mepc, t0
-    la      ra, _make_HART_sleep
+    la      ra, _make_HART_sleep  // the kernel shuts down after execution
     
     # Update the value in the satp. The satp value was returned by kinit() via register a0
     # sfence.vma 

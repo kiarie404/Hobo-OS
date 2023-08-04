@@ -80,18 +80,12 @@ pub extern "C" fn kinit () {
 
     // // define the address of the TrapFrame
     // // let mut trap_frame = interrupt_and_exception_handling::TrapFrame::zero();
-    // let trap_frame_ref = unsafe { &mut kernel_trap_frame};
-    // let trap_frame_ptr = trap_frame_ref as *mut TrapFrame;
-    // let trap_frame_address = trap_frame_ptr as usize;
-
-    // // // map trapframe 
-    // //     let trap_frame_address
-    // //     // make sure you get an address that is divisible by 4096 pre
-    // //     if trap_frame_address % 4096 != 0 {
-    // //         let post_address = align(trap_frame_address, 12);
-    // //         let pre_address = post_address - 4096;
-    // //     }
-
+    let trap_frame_ref = unsafe { &mut kernel_trap_frame};
+    let trap_frame_ptr = trap_frame_ref as *mut TrapFrame;
+    let trap_frame_address = trap_frame_ptr as usize;
+    // // update the mscratch register with the address of the trapframe
+    unsafe {riscv::mscratch_write(trap_frame_ptr as u64);}
+    unsafe {println!("address while in kinit : {}", trap_frame_ptr as u64)};
 
 
     // // update the kernel satp value and kernel root table address global
@@ -100,9 +94,7 @@ pub extern "C" fn kinit () {
     //     kernel_root_table_address_gl =  kernel_root_table_address;
     // }
 
-    // // update the mscratch register with the address of the trapframe
-    // unsafe {riscv::mscratch_write(trap_frame_ptr as u64);}
-    // unsafe {println!("address while in kinit : {}", trap_frame_ptr as u64)};
+    
     let x = 12;
     let y = 20;
     unsafe {asm!("add t5, {}, {}", in(reg)x, in(reg)y )};
@@ -126,9 +118,9 @@ pub extern "C" fn kinit () {
 
 #[no_mangle]
 pub extern "C" fn kmain() -> (){
-    // // Show that we are in supervisor mode
-    //     println!("Hello world, I am in supervisor mode!!!");
-    //     // let mstatus_value = riscv::mstatus_read();    // WILL NOT WORK BECAUSE WE ARE IN SUPERVISOR MODE
+    // Show that we are in supervisor mode
+        println!("Hello world, I am in supervisor mode!!!");
+        let mstatus_value = riscv::mstatus_read();    // WILL NOT WORK BECAUSE WE ARE IN SUPERVISOR MODE
     //     let sstatus_value = riscv::sstatus_read();
     //     // println!("mstatus : {:b}", mstatus_value);   // WILL NOT WORK 
     //     println!("sstatus : {:b}", sstatus_value);
@@ -155,7 +147,7 @@ pub extern "C" fn kmain() -> (){
 
     // let trap_frame_address = riscv::mscratch_read();
     // println!("See the error did not stop the program flow");
-    println!("hahaha");
+    println!("hahaha, I am going to shut down.... see you later.");
     return ();
 }
 

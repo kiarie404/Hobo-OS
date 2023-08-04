@@ -13,6 +13,7 @@
             "printCalls": true,
             "cwd": "${workspaceRoot}",
             "valuesFormatting": "parseText"
+            
         }
     ]
 }
