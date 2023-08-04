@@ -85,10 +85,12 @@ _clear_BSS_section_loop:
 
 _initialize_registers_for_kinit:
     la		sp, _stack_end                          # setup the stack pointer
-    li		t0, (0b11 << 11) | (0 << 7) | (0 << 3)  # Set MPP field to 11 (Machine Mode), kinit will execute in Machine mode
+    li		t0, (0b11 << 11) | (1 << 7) | (1 << 3)  # Set MPP field to 11 (Machine Mode), kinit will execute in Machine mode
                                                     # Bit 7, sets MPIE bit to 0 ; once we get into kinit, we will not need any interference
                                                     # Bit 3, Sets the MIE bit to 0 ; '_initialize_registers_for_kinit' does not need interference 
     csrw	mstatus, t0
+    li t3, 0b1111111111111111
+    csrw mie, t3
 
     # set kinit to be the value that will be pasted tp the PC counter after calling mret
     la		t1, kinit

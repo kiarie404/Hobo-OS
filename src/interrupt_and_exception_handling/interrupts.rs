@@ -1,5 +1,6 @@
 use super::TrapFrame;
 use crate::{print, println};
+use crate::drivers::timer::Timer;
 
 /// Interrupt enumeration
 #[derive(Debug, Clone, Copy)]
@@ -37,9 +38,11 @@ pub fn handle_interrupt(trapframe: &mut TrapFrame){
         }
         5 => {
             println!(" Handling SupervisorTimerInterrupt");
+             Timer::mtimecmp_write(Timer::mtime_read() + 10_000_000);
         }
         7 => {
             println!(" Handling MachineTimerInterrupt");
+            Timer::mtimecmp_write(Timer::mtime_read() + 10_000_000);
         }
         8 => {
             println!(" Handling UserExternalInterrupt");

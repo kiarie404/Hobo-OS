@@ -89,7 +89,7 @@ pub extern "C" fn rust_trap_handler()-> usize{
 /// determines if the cause of trap was an interrupt or Exception.  
 /// Th function returns true if the occurence was an interrupt and false if the occurence was an exception
 fn check_if_interrupt(trapframe: &TrapFrame) -> bool{
-    let mcause_value = trapframe.satp;
+    let mcause_value = trapframe.mcause;
     // extract async/sync bit. ie bit[63]
     let async_sync_bit = mcause_value >> 63;
 
@@ -101,7 +101,7 @@ fn check_if_interrupt(trapframe: &TrapFrame) -> bool{
 /// determines if the cause of trap was an Exception.  
 /// The function returns true if the occurence was an exception and false if the occurence was an interrupt
 fn check_if_exception(trapframe: &TrapFrame) -> bool{
-    let mcause_value = trapframe.satp;
+    let mcause_value = trapframe.mcause;
     // extract async/sync bit. ie bit[63]
     let async_sync_bit = mcause_value >> 63;
 

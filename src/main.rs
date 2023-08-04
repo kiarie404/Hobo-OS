@@ -20,6 +20,7 @@ mod riscv;
 mod interrupt_and_exception_handling;
 
 
+
 // usage of accessible modules
 use core::{arch::asm, panic::PanicInfo};
 use core::fmt::Write; // enable the use of Write functions in this scope
@@ -27,6 +28,7 @@ use stdin::continuous_keyboard_read;
 
 use crate::interrupt_and_exception_handling::TrapFrame;
 use crate::sv39_mmu::{map, show_mappings, unmap, translate};
+use crate::drivers::timer::Timer;
 
 static mut kernel_satp_value_gl: usize = 0;
 static mut kernel_root_table_address_gl : usize = 0;
@@ -57,8 +59,8 @@ pub extern "C" fn kinit () {
     // // You can access both mstatus and sstatus because you are in machine mode
     let mstatus_value = riscv::mstatus_read();
     let sstatus_value = riscv::sstatus_read();
-    println!("mstatus : {:b}", mstatus_value);
-    println!("sstatus : {:b}", sstatus_value);
+    // println!("mstatus : {:b}", mstatus_value);
+    // println!("sstatus : {:b}", sstatus_value);
 
 
     // // initialize memory
@@ -95,9 +97,9 @@ pub extern "C" fn kinit () {
     // }
 
     
-    let x = 12;
-    let y = 20;
-    unsafe {asm!("add t5, {}, {}", in(reg)x, in(reg)y )};
+    // let x = 12;
+    // let y = 20;
+    // unsafe {asm!("add t5, {}, {}", in(reg)x, in(reg)y )};
     // let q : usize;
     // unsafe {asm!("add {}, t5, zero", out(reg)q)};
     // println!("q : {}", q);
@@ -106,8 +108,13 @@ pub extern "C" fn kinit () {
 
     // // println!("{:?}", dup_ref);
     // // unsafe {println!("address while in kinit : {}", trap_frame_ptr as u64)};
-
     
+    // Test for a timer interrupt
+    // Timer::mtimecmp_write(Timer::mtime_read() + 10_000_000); // interrupt will happen after a second
+    // println!("mtimecmp: {}", Timer::mtimecmp_read());
+    // println!("mtime: {}", Timer::mtime_read());
+    println!("{}", riscv::mscratch_read());
+
 
     
 
@@ -147,7 +154,14 @@ pub extern "C" fn kmain() -> (){
 
     // let trap_frame_address = riscv::mscratch_read();
     // println!("See the error did not stop the program flow");
+
+    // Test for a timer interrupt
+    // Timer::mtimecmp_write(Timer::mtime_read() + 10_00); // interrupt will happen after a second
+
+    // test for an environment call exception
     unsafe{ asm!("ecall")};
+
+    
     println!("hahaha, I am going to shut down.... see you later.");
     return ();
 }
