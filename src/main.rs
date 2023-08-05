@@ -5,7 +5,7 @@
 #![feature(custom_test_frameworks)] // enable the use of a custom test framework
 #![test_runner(crate::test_framework::test_runner)]
 #![reexport_test_harness_main = "test_framework_entry_point"] // give the entrypoint a custom name, and add it to the program flow
-
+#![feature(error_in_core)] // so as to use the Error trait 
 
 // mod utilities;
 mod drivers;
@@ -156,7 +156,7 @@ pub extern "C" fn kmain() -> (){
     // println!("See the error did not stop the program flow");
 
     // Test for a timer interrupt
-    // Timer::mtimecmp_write(Timer::mtime_read() + 10_00); // interrupt will happen after a second
+    Timer::mtimecmp_write(Timer::mtime_read() + 10_00); // interrupt will happen after a second
 
     // test for an environment call exception
     unsafe{ asm!("ecall")};
