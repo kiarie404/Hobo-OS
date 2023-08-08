@@ -23,8 +23,8 @@ pub enum ExceptionType{
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum ExceptionHandlingError{
-    UnableToRecoverFromException
+pub enum ExceptionHandlingError<'a>{
+    UnableToRecoverFromException(&'a str),
 }
 
 pub fn handle_exception(trapframe: &mut TrapFrame) -> Result<usize, ExceptionHandlingError>{
@@ -32,19 +32,22 @@ pub fn handle_exception(trapframe: &mut TrapFrame) -> Result<usize, ExceptionHan
     let cause = trapframe.mcause & !(1 << 63);
 
     // match cause
+    // todo!("make the error message display the address that caused problems") 
     match cause {
         0   => {
             println!("Handling InstructionAddressMisaligned");
-            return Err(ExceptionHandlingError::UnableToRecoverFromException);  
+            let misaligned_address = riscv::mtval_read();
+            return Err(ExceptionHandlingError::UnableToRecoverFromException("Instruction Address Misaligned Excption occured ")); 
+            
         },
         1   => {
             println!("Handling InstructionAccessFault");
-            return Err(ExceptionHandlingError::UnableToRecoverFromException);  
+            return Err(ExceptionHandlingError::UnableToRecoverFromException("InstructionAccessFault occured "));  
         },
 
         2   => {
             println!("Handling IllegalInstruction : {}", trapframe.mepc);
-            return Err(ExceptionHandlingError::UnableToRecoverFromException);
+            return Err(ExceptionHandlingError::UnableToRecoverFromException("IllegalInstruction occured "));
         },
 
         3   => {
@@ -54,19 +57,19 @@ pub fn handle_exception(trapframe: &mut TrapFrame) -> Result<usize, ExceptionHan
         },
         4   => {
             println!("Handling LoadAddressMisaligned");
-            return Err(ExceptionHandlingError::UnableToRecoverFromException); 
+            return Err(ExceptionHandlingError::UnableToRecoverFromException("LoadAddressMisaligned occured ")); 
         },
         5   => {
             println!("Handling LoadAccessFault");
-            return Err(ExceptionHandlingError::UnableToRecoverFromException); 
+            return Err(ExceptionHandlingError::UnableToRecoverFromException("LoadAccessFault occured ")); 
         },
         6   => {
             println!("Handling StoreAddressMisaligned");
-            return Err(ExceptionHandlingError::UnableToRecoverFromException);
+            return Err(ExceptionHandlingError::UnableToRecoverFromException("StoreAddressMisaligned occured "));
         },
         7   => {
             println!("Handling StoreAccessFault");
-            return Err(ExceptionHandlingError::UnableToRecoverFromException);
+            return Err(ExceptionHandlingError::UnableToRecoverFromException("StoreAccessFault occured "));
         },
         8   => {
             println!("Handling UserEnvironmentCall");
@@ -80,21 +83,23 @@ pub fn handle_exception(trapframe: &mut TrapFrame) -> Result<usize, ExceptionHan
         },
         11   => {
             println!("Handling MachineEnvironmentCall");
-            return Err(ExceptionHandlingError::UnableToRecoverFromException);
+            return Err(ExceptionHandlingError::UnableToRecoverFromException("MachineEnvironmentCall occured "));
         },
         12   => {
             println!("Handling InstructionPageFault");
-            return Err(ExceptionHandlingError::UnableToRecoverFromException);
+            return Err(ExceptionHandlingError::UnableToRecoverFromException("InstructionPageFault occured "));
         },
         13   => {
             println!("Handling LoadPageFault");
-            return Err(ExceptionHandlingError::UnableToRecoverFromException);
+            return Err(ExceptionHandlingError::UnableToRecoverFromException("LoadPageFault occured "));
         },
         15   => {
             println!("Handling StorePageFault");
-            return Err(ExceptionHandlingError::UnableToRecoverFromException);
+            return Err(ExceptionHandlingError::UnableToRecoverFromException("StorePageFault occured "));
         },
 
         _   => {    panic!("Unhandled exception trap cause -> {}\n", cause);  }
     }
 }
+
+

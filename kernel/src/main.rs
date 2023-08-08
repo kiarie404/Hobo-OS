@@ -9,9 +9,8 @@ use core::arch::asm;
 // macros
 use hobo_os::{print, println};
 use hobo_os::drivers;
-use hobo_os::stdout;
-use hobo_os::stdin;
 use hobo_os::interrupt_and_exception_handling as trap_handler;
+use hobo_os::riscv;
 
 // defining the entry point function
 // kinit returns the satp value .  
@@ -34,10 +33,11 @@ pub extern "C" fn kmain() -> (){
 
     // loop{}
 
-    let input_line = hobo_os::stdin::read_line().expect("Unable to read line from stdin buffer");
+    // An illegal instruction exception
+    riscv::mcause_read();
 
-    if input_line.len() == 0 {println!("stdin buffer is empty")};
-    hobo_os::println!("{:?}", input_line);
+    // endless loop keeps OS busy 
+    // loop {}
 
 
     println!("Peace Out, I am going to shut down.... see you later.");
