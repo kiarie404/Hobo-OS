@@ -92,6 +92,7 @@ _initialize_registers_for_kinit:
     li t3, 0b1111111111111111
     csrw mie, t3
 
+
     # set kinit to be the value that will be pasted tp the PC counter after calling mret
     la		t1, kinit
 	csrw	mepc, t1   

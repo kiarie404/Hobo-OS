@@ -6,7 +6,7 @@ use crate::sv39_mmu::errors;
 use crate::sv39_mmu::*;
 
 #[test_case]
-pub fn sv39_mmu_tests(){
+pub fn sv39_mmu_test_switch(){
     println!("\n---------  Running sv39_mmu tests  ---------\n");
     test_validate_virtual_address_above_range();
     test_validate_virtual_address_within_range();

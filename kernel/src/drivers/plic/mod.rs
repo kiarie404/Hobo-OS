@@ -5,6 +5,7 @@
 mod errors;
 
 use self::errors::PlicError;
+use crate::{print, println};
 
 // PLIC register addresses
 const PLIC_PRIORITY: usize = 0x0c00_0000;
@@ -61,6 +62,15 @@ pub fn enable_interrupt(interrupt_id: u32){
     }
 }
 
+pub fn check_if_enabled(interrupt_id: u32)-> bool{
+    let ptr = PLIC_INT_ENABLE as *const u32;
+    let value = unsafe {ptr.read_volatile()};
+    let mask: u32 = 1 << 10;
+    let masked = value & mask;
+    if masked == 0 { return false; }
+    else { true }
+}
+
 /// Disables the Interrupt associated with the input Interrupt ID
 // pub fn disable_interrupt(interrupt_id: u32) -> Result<(), PlicError>{
 //     unimplemented!()
@@ -94,7 +104,32 @@ pub fn is_pending(id: u32) -> bool {
     actual_id & pend_ids != 0
 }
 
+/// Get the threshold of an interrupt
 
+
+pub fn display(){
+    println!("PLIC state");
+
+    let uart_pending = is_pending(10);
+    println!("\t Uart Interrupt Enabled : {}", check_if_enabled(10));
+    println!("\t Uart Pending : {}", uart_pending);
+    println!("\t Uart Priority : {}", priority_read(10));
+    println!("\t Overall THreshold : {}", threshold_read());
+}
+
+/// This function does the initial configurations of the plic.
+/// It enables interrupts, set their priorities and sets the overall threshold
+pub fn init(){
+    // enable interrupts
+    // enable_interrupt(10); // UART iterrupts
+
+    // set overall threshold
+    threshold_write(0).unwrap();
+
+    // Set individual priorities
+    priority_write(10, 7);
+
+}
 
 // // THis function returns an array of all pending interrupts
 // pub fn get_pending_interrupts() ->  Result<(), PlicError >{

@@ -3,6 +3,9 @@
 //!  The UART device out transmission is connected to the Console
 
 
+pub static mut STDOUT_BUFFER: [u8; 100] = [27; 100]; // fill the Buffer with esc characters to signiy that it is empty.
+
+
 /// This macro prints a formatted string to the console.  
 /// This macro is callable across the whole crate. It can also be called by external crates
 #[macro_export]
@@ -36,4 +39,21 @@ macro_rules! println {
 	($fmt_string:expr, $($args:tt)+) => ({
 		print!(concat!($fmt_string, "\r\n"), $($args)+)
 	});
+}
+
+
+pub fn flush_std_buffer(){
+    let buffer_empty = check_if_buffer_is_empty();
+    let buffer_ref = unsafe{&STDOUT_BUFFER};
+    if buffer_empty == false{
+        let buffer_as_str = core::str::from_utf8(buffer_ref).unwrap();
+        println!("{}", buffer_as_str);
+    }
+}
+
+fn check_if_buffer_is_empty() -> bool{
+    // buffer is empty if it is filled with escape_ascii values
+    let stdout_buffer_ref = unsafe{&STDOUT_BUFFER};
+    if stdout_buffer_ref == &[27; 100]{ return true; }
+    else {return false} 
 }
