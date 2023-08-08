@@ -9,8 +9,10 @@
 mod memory_abstractions;
 mod memory_errors;
 mod tests; // tests that test the functions defined in this module
+
+
 use memory_abstractions::{FullHeapLayout, DescriptorValue, PageDescriptor, Page, PageMMIO};
-use memory_errors::{MemoryAllocatioErrors, MemoryDeallocatioError};
+use memory_errors::{MemoryDeallocationError, MemoryAllocationError};
 use core::mem::size_of;
 use crate::{print, println};
 
@@ -24,7 +26,7 @@ extern "C"{
 static START : &usize = unsafe{&HEAP_START};
 static END   : &usize = unsafe{&HEAP_END};
 static mut ALLOC_START : usize = 0;
-static mut NUM_DP : usize = 0; // the number of pages created. THe number of pages also equals the number of descriptors
+static mut NUM_DP : usize = 0; // the number of pages in the heap. THe number of pages also equals the number of descriptors
 
 // The FullHeapLayout contains all metadata about the Heap stats, The allocations and deallocations
 // The FullHeapLayout contents get updated by the following functions :
@@ -44,9 +46,9 @@ fn get_heap_size() -> usize{
 /// 2. Divides the heap into Segments : Descriptors and Pages   
 /// You can view the layout of the heap using the "fn show_layout()" function
 pub fn init_memory(){
-    println!(">>>> Initializing memory");
+    println!(">>>> Initializing memory"); // [remove]
     // clear memory, make every byte in the heap a zero
-    clear_entire_heap(); 
+    clear_entire_heap(); // [undone] : this operation is expensive, find a way to fix it
 
     // Determine Heap layout, and update the global variables {ALLOC_START, NUM_DP}.
     determine_heap_layout();
@@ -54,6 +56,7 @@ pub fn init_memory(){
 }
 
 // This function traverses the entire heap and makes sure each value under each address is zero
+// [undone] : this operation is very very expensive... is it even necerrary?
 fn clear_entire_heap(){
     let mut index = unsafe{HEAP_START.clone()};
     while index <= unsafe{HEAP_END} {
@@ -72,8 +75,8 @@ fn align (val: usize, order: usize) -> usize{
     return result;
 }
 
-// This function returns the SimpleHeapLayout, outliing the numer of Pages to be created, Descriptors and the actial ALLOC address
-// It also modifheap_end   = Some(HEAP_END)ies the static ALLOC_START address
+// This function updates the HEAPLAYOUT static struct
+// It can only be called after the memory has been initialized, otherwise, if called before that, it will produce crappy data
 fn determine_heap_layout(){
     // calculate the MAXIMUM number of dexcriptors and Pages that can be made in the heap space
     // MAX number = (heap_memory_size) / (sizeof_page_and_descriptor)
@@ -119,18 +122,18 @@ fn determine_heap_layout(){
 
 /// This function takes in the number of requested pages and returns the memory address of the first page of the contiguous page allocation     
 /// alloc() returns an error if requested zero pages    
-/// it also returns an error if No contiguous free space is found
-pub fn alloc(req_pages: usize) -> Result<usize, MemoryAllocatioErrors>{
-    // println!(">>>> Allocating {} Pages....", req_pages);
+/// it also returns an error if No sufficient contiguous free space is found. At that point, you may need to fragment things
+pub fn alloc(req_pages: usize) -> Result<usize, MemoryAllocationError>{
+    println!(">>>> Allocating {} Pages....", req_pages);
     // check if required pages is zero. If its zero, throw an error...
-    if req_pages == 0 { return Err(MemoryAllocatioErrors::ZeroPagesRequested("Zero pages were requested from the allocator"));}
+    if req_pages == 0 { return Err(MemoryAllocationError::ZeroPagesRequested("Zero pages were requested from the allocator"));}
     else { // traverse the array of descriptors, lookng for a contiguous free space
         let search_result = find_first_contiguous(req_pages); // return address of first contiguous space
         let mut first_descriptor_index : usize;
 
         match search_result {
            Some(descriptor_index) => first_descriptor_index = descriptor_index,
-           None => return Err(MemoryAllocatioErrors::NoFreeContiguousSpace("No Free contiguous pages were found")) 
+           None => return Err(MemoryAllocationError::NoFreeContiguousSpace("No Free contiguous pages were found")) 
         }
 
         // Now that we have the index of the first Descriptors of the contiguous space....
@@ -149,6 +152,8 @@ pub fn alloc(req_pages: usize) -> Result<usize, MemoryAllocatioErrors>{
     }
 }
 
+// This function fills a contiguous group of descriptors with values. It makes sure the order of values in not contradictory:
+// Eg : [First, First ] would never occur
 fn fill_descriptors(first_descriptor_index: usize, req_pages: usize){
     unsafe {
         let base_descriptor_ptr = HEAP_START as *mut PageDescriptor; // access the array of descriptors
@@ -165,17 +170,17 @@ fn fill_descriptors(first_descriptor_index: usize, req_pages: usize){
 
                if (index == 0){
                     desc_ref.set_first();
-                    println!("   >>>> Ox{:x} : {:?}",desc_ptr as usize, desc_ref.get_val() );
+                    // println!("   >>>> Ox{:x} : {:?}",desc_ptr as usize, desc_ref.get_val() ); [remove]
                }
 
                else if (index < last_index){
                     desc_ref.set_middle();
-                    println!("   >>>> Ox{:x} : {:?}",desc_ptr as usize, desc_ref.get_val() );
+                    // println!("   >>>> Ox{:x} : {:?}",desc_ptr as usize, desc_ref.get_val() );  [remove]
                }
 
                else {
                     desc_ref.set_last();
-                    println!("   >>>> Ox{:x} : {:?}",desc_ptr as usize, desc_ref.get_val() );
+                    // println!("   >>>> Ox{:x} : {:?}",desc_ptr as usize, desc_ref.get_val() );  [remove]
                }
 
             }
@@ -185,6 +190,7 @@ fn fill_descriptors(first_descriptor_index: usize, req_pages: usize){
     }
 }
 
+// THis function updates the numbbers of the alloc/dealloc pages in the HEAPLAYOUT
 fn update_heap_page_states(){
     let mut num_of_allocated_pages : usize;
     let mut num_of_unallocated_pages: usize;
@@ -199,12 +205,13 @@ fn update_heap_page_states(){
 // counts the number of allocated and unallocated descriptors 
 // It returns (allocated, unallocated)
 fn get_page_counts() -> (usize, usize){
-    println!(">>>> Parsing the heap and determining the number of both allocated and unallocated pages...this will take some time...");
+    println!(">>>> Parsing the heap and determining the number of both allocated and unallocated pages...this will take some time..."); // [remove]
+    println!("\t >>>> To reduce the time, how about reducing the number of descriptors to be passed... for test purposes only.");
     unsafe{
         let base_desc_ptr = HEAP_START as *const PageDescriptor;
         let mut count_of_allocated: usize = 0;
         let mut count_of_unallocated : usize = 0;
-        for index in 0..NUM_DP{
+        for index in 0..10000{   // [test] : You can reduce the number of descriptors to be parsed. efault Value NUM_DP
             let current_desc_ptr = base_desc_ptr.add(index);
             let current_desc_ref = & *current_desc_ptr;
             match current_desc_ref.get_val() {
@@ -216,9 +223,10 @@ fn get_page_counts() -> (usize, usize){
             }   
         }
         
-
+        println!("\t >>>> Parsing complete");
         return (count_of_allocated,count_of_unallocated);
     }
+    
 }
 
 /// This function checks if the Descriptors are arranged well, that their ordr is not messed up :   
@@ -230,7 +238,7 @@ fn get_page_counts() -> (usize, usize){
     /// All Empty Descriptors are followed by Empty, FirstTaken, Flast  BUT NOT Last, Middle
 pub fn check_descriptor_ordering() -> bool{
     unsafe{
-        println!(">>>> Checking order of dexcriptors...");
+        println!(">>>> Checking order of descriptors...");
         let base_desc_ptr = HEAP_START as *const PageDescriptor;
         let base_desc_ref = & *base_desc_ptr;
 
@@ -301,7 +309,7 @@ pub fn check_descriptor_ordering() -> bool{
         }
 
         // if no false return happened
-        println!(">>>> Order of descriptors is fine");
+        println!("\t >>>> Order of descriptors is fine");
         return true;
     }
 
@@ -317,16 +325,16 @@ pub fn check_descriptor_ordering() -> bool{
 /// Errors thrown include:  
 /// 1. Address passed to the function is not the first in its associated contiguous allocation
 /// 2. Address passed is not a valid address. because it is not found within the Heap Page section, or it is not a Page's first byte. 
-pub fn dealloc(page_addr: usize) -> Result<(), MemoryDeallocatioError>{
+pub fn dealloc(page_addr: usize) -> Result<(), MemoryDeallocationError>{
     println!(">>>> Deallocating contiguous memory at address : 0x{:x}...", page_addr);
     // validate page_addr... and move on to deallocation
     if check_if_page_within_heap(page_addr) == false { 
-        return Err(MemoryDeallocatioError::NonHeapAddressFound("Page address is not within the Heap Memory range")); }
-    else if check_if_page_top_addr(page_addr) == false {
-        return Err(MemoryDeallocatioError::PageAddressIsMiddlePage("The address is not divisible by 4096"));
+        return Err(memory_errors::NON_HEAP_ADDRESS); }
+    else if check_if_page_addr(page_addr) == false {
+        return Err(memory_errors::NON_PAGE_ADDRESS);
     }
     else if check_if_page_is_first(page_addr) == false {
-        return Err(MemoryDeallocatioError::PageNotLeading("The Page address references to a Page that is not the leading page in the contiguous group of pages"));
+        return Err(memory_errors::PAGE_NOT_LEADING);
     }
     else {
         let page_index = get_page_index_from_addr(page_addr);
@@ -390,7 +398,7 @@ fn check_if_page_within_heap(page_addr: usize) -> bool{
 
 // checks if the page address references the start of a page and not within it
 // An address is at the start if it is a multiple of 4096
-fn check_if_page_top_addr(page_addr: usize) -> bool{
+fn check_if_page_addr(page_addr: usize) -> bool{
     let remainder = page_addr % 4096;
     if remainder > 0 {  return false; }
     else { return true; }
@@ -402,7 +410,7 @@ fn check_if_page_top_addr(page_addr: usize) -> bool{
 // Errors are thrown when :  
 // 1. The Index passed is not pointing to a first page
 // 2. THe contiguous descriptors are not in order : eg fisrt-middle-NO_LAST  OR first-NO_LAST 
-fn empty_group_of_descriptors(index: usize) -> Result<usize, MemoryDeallocatioError>{
+fn empty_group_of_descriptors(index: usize) -> Result<usize, MemoryDeallocationError>{
     println!(">>>> Deallocating descriptors....");
     unsafe{
      // get variables ready
@@ -412,9 +420,9 @@ fn empty_group_of_descriptors(index: usize) -> Result<usize, MemoryDeallocatioEr
      let subject_val = subject_ref.get_val();
 
      match subject_val {
-         DescriptorValue::Empty => return Err(MemoryDeallocatioError::Other("Tried to free an empty Descriptor")),
-         DescriptorValue::LastAndTaken => return Err(MemoryDeallocatioError::Other("The Passed index was not a leading descriptor")),
-         DescriptorValue::MiddleAndTaken => return Err(MemoryDeallocatioError::Other("The Passed index was not a leading descriptor")),
+         DescriptorValue::Empty => return Err(MemoryDeallocationError::Other("Tried to free an empty Descriptor")),
+         DescriptorValue::LastAndTaken => return Err(MemoryDeallocationError::Other("The Passed index was not a leading descriptor")),
+         DescriptorValue::MiddleAndTaken => return Err(MemoryDeallocationError::Other("The Passed index was not a leading descriptor")),
          DescriptorValue::FirstAndLast => {
             subject_ref.set_empty(); // free that descriptor
             return Ok(1);
@@ -423,16 +431,16 @@ fn empty_group_of_descriptors(index: usize) -> Result<usize, MemoryDeallocatioEr
             // loop until you find the last Descriptor for that allocation. 
             // make sure the descriptors are in order
             let mut count: usize = 1;
-            println!(">>> Doing the order check...");
+            println!("\t >>> Doing the order check...");
             loop {
                 let next_desc_ptr = subject_ptr.add(count);
                 let next_desc_ref = &mut *next_desc_ptr;
                 let next_desc_val = next_desc_ref.get_val();
                 match next_desc_val {
-                    DescriptorValue::Empty => return Err(MemoryDeallocatioError::Other("Misplaced Empty Descriptor")),
+                    DescriptorValue::Empty => return Err(MemoryDeallocationError::Other("Misplaced Empty Descriptor")),
                     DescriptorValue::LastAndTaken => { break; }, // break out, the order of descriptors is fine
-                    DescriptorValue::FirstAndLast => return Err(MemoryDeallocatioError::Other("Misplaced FirstAndLast Descriptor")),
-                    DescriptorValue::FirstAndTaken => return Err(MemoryDeallocatioError::Other("Misplaced FirstAndTaken Descriptor")),
+                    DescriptorValue::FirstAndLast => return Err(MemoryDeallocationError::Other("Misplaced FirstAndLast Descriptor")),
+                    DescriptorValue::FirstAndTaken => return Err(MemoryDeallocationError::Other("Misplaced FirstAndTaken Descriptor")),
                     DescriptorValue::MiddleAndTaken => {
                         count = count + 1; // we only get out of this loop if we get an error or if we reach the last descriptor
                     },
@@ -441,13 +449,13 @@ fn empty_group_of_descriptors(index: usize) -> Result<usize, MemoryDeallocatioEr
 
             // If the order is fine, then clear the contiguous descriptors
             count = 0;
-            println!(">>> Doing the emptying loop...");
+            println!("\t >>> Doing the emptying loop...");
             loop {
                 let current_desc_ptr = subject_ptr.add(count);
                 let current_desc_ref = &mut *current_desc_ptr; 
                 if current_desc_ref.get_val() == DescriptorValue::LastAndTaken {
                     current_desc_ref.set_empty();
-                    println!(">>>> Finished Emptying Descriptors....");
+                    println!("\t >>>> Finished Emptying Descriptors....");
                     return Ok(count+1); // returns the number of descriptors deallocated
                 }  
                 else {  current_desc_ref.set_empty();

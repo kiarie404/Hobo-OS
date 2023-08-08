@@ -7,7 +7,7 @@ use core::fmt::{Display, write};
 use core::fmt;
 
 // Abstracting the memory part
-// 
+
 
 // get the heap memory labels from the /asm/memory_export.s assembly file
 extern "C"{
@@ -54,7 +54,7 @@ impl PageDescriptor {
         PageDescriptor { value: DescriptorValue::Empty }
     }
 
-    // this function creates a PageDescriptor that contains the passed value
+    // this function creates a PageDescriptor that contains the input value
     pub fn new(val: DescriptorValue) -> Self{
         PageDescriptor { value: val }
     }
@@ -77,6 +77,7 @@ pub struct PageMMIO{
 }
 
 impl PageMMIO{
+    // zeroes out all bytes in a page
     pub fn clear(&mut self){
         for element in &mut self.content{
             unsafe { element.write(0)}  ;
@@ -109,9 +110,9 @@ impl Page{
 
 }
 
-// Full info about the Heap
-// This can be used to monitor the heap OR check for conflicting errors
-// Think of it as the a struct containing all the metadata about the Heap
+/// Full info about the Heap
+/// This can be used to monitor the heap OR check for conflicting errors
+/// Think of it as the a struct containing all the metadata about the Heap
 #[derive(Debug)]
 pub struct FullHeapLayout{
     // overall stats of the heap
@@ -136,10 +137,10 @@ pub struct FullHeapLayout{
     // From here It is data that changes with respect to allocations and deallocations
     // This data can be used to debug the memory allocatio or fix RAM issues or monitor Heap Usage
     pub num_of_allocated_pages : usize, // determined by looking through the descriptors (simple_check)
-    pub num_of_unallocated_pages : usize, // determined by checkig the descriptors (simple_check)
-    pub num_of_allocations_done : usize,
-    pub num_of_deallocations_done : usize, // another way of detrmininf the state of the Heap.
-    //  Comparing these differet results can help detect a breach
+    pub num_of_unallocated_pages : usize, // determined by checking the descriptors (simple_check)
+    pub num_of_allocations_done : usize, // counted dynamically, updated every time an allocation gets done
+    pub num_of_deallocations_done : usize, // counted dynamically, updated every time an allocation gets done
+    //  If the above 4 fields contradict each other, it means there is a bug somewhere... or someone has physically dioriented your memory 
 
 }
 
