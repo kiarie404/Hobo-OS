@@ -1,9 +1,9 @@
 #[derive(Debug, PartialEq)]
 pub enum MappingError{
-    InvalidPhysicalAddress(&'static str),
-    InvalidVirtualAddress(&'static str),
-    InvalidRootTableAddress(&'static str),
-    InvalidAccessMap(&'static str)
+    InvalidPhysicalAddress(&'static str), // Address must be within the 56 bit range + It should be a Page_Address
+    InvalidVirtualAddress(&'static str), // Page_Address(ends wit 12 zeroes), within the 39 bit range 
+    InvalidRootTableAddress(&'static str), // Address must be Taken, Page_Address(ends wit 12 zeroes), within the 56 bit range 
+    InvalidAccessMap(&'static str) // an access map is valid ONLY when at least one of the RXW is defined AND all other bits are ZERO
 }
 
 

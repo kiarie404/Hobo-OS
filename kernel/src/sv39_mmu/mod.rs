@@ -1,3 +1,5 @@
+//! This module abstracts the Riscv SV39 MMU. It provides mapping, unmapping and translation functions. You can additionally inspect the tables
+
 mod mmu_abstractions;
 mod errors;
 mod tests;
@@ -7,13 +9,13 @@ use errors::MappingError;
 use crate::page_manager;
 use crate::{print, println};
 
-/// ### The Map Function 
+/// The Map Function 
 /// Each Process gets its own Translation Tables ie. Root_Table, Mid_Table, Leaf_Table  
-/// The Map Function updates the Translation tables for that process   
+/// The Map Function populates the Translation tables for that process   
 /// Whenever a process gets a new page allocated to it, the new Virtual page address and the corresponding new physical Address need to 
 /// get stored to the translation Tables of the specific process.  
 ///  
-/// The Map Function takes the Virtual address and the Physical address and puts them in the Translation Table
+/// The Map Function takes the Virtual address and the Physical address and puts them in the Translation Table (populates the table)
 /// Inputs for the function :   
 ///       1. Root Physical address extracted from SATP  
 ///       2. Valid Virtual address to a Page    
@@ -23,7 +25,19 @@ use crate::{print, println};
 ///          1. Extracting from the Page allocator will guaratee validity   
 ///          2. within the 56 bit range 
 ///          3. divisible by 4096   
-///       4. Valid access permissions {at least one specification to be provided}   
+///       4. Valid access permissions {at least one specification to be provided}  
+/// 
+///  
+/// 
+/// [remove]
+///  Warning, to you future reader, this map function assumes that the physical addresses being passed to it have been allocated validly.
+/// But when Identity mapping the Kernel, you may choose not pass to it allocated addresses.  
+/// Unmapping deallocates all the physical pages referenced by the page tables. So if you passed unallocated pages to the map function,
+///  deallocation will be erroneous.  
+/// ===> Keep that in mind. 
+/// 
+/// THis model of unmapping was chosen based on the design that at no point will physical addresses be shared by processes.... 
+/// unless the kernel lends both processes its own space by syscalls
 
 //    2. Errors : incorrect access specifications 
 pub fn map(virt_address: u64, physical_address: u64, access_map: u64, root_table_address: u64) -> Result<(), errors::MappingError>{
@@ -97,7 +111,7 @@ pub fn map(virt_address: u64, physical_address: u64, access_map: u64, root_table
             // Set the leaf entry to point to the physical Page address
                 leaf_table_entry.set_address(physical_address);
                 leaf_table_entry.set_as_valid();
-                leaf_table_entry.set_val_with_access_map(access_map);
+                leaf_table_entry.add_access_mask(access_map);
             
             return Ok(());
         }
@@ -198,12 +212,12 @@ pub fn unmap(root_table_address: u64){
                         if leaf_table_entry.check_if_valid() == false { /* do nothing */}
                         else { // deallocate the physical address being referenced 
                            page_manager::dealloc(leaf_table_entry.get_address() as usize);
-                           println!("I WILL DEALLOCATE : {:016x}", leaf_table_entry.get_address() as usize);
+                        //    println!(" >>>> I WILL DEALLOCATE : {:016x}", leaf_table_entry.get_address() as usize);
                         }
                     }
 
                     // deallocate leaf table itself
-                    println!("I WILL DEALLOCATE leaf address: {:016x}", leaf_table_ptr as usize);
+                    // println!(" >>>> I WILL DEALLOCATE leaf address: {:016x}", leaf_table_ptr as usize);
                     page_manager::dealloc(leaf_table_ptr as usize);
                 }
             }
@@ -253,7 +267,7 @@ fn validate_access_map(map: u64) -> bool{
     else { false }
 }
 
-
+/// Shows the virtual-to-physical Table
 pub fn show_mappings(root_table_address: u64){
 
     let root_table_ptr = root_table_address as *mut Table;
@@ -292,7 +306,7 @@ pub fn show_mappings(root_table_address: u64){
                         else { // print the physical address being referenced 
                            let combined_virt_address = (virt_address_root << 30) | (virt_address_mid << 21) | (virt_address_leaf << 12);
                            let physical_address = leaf_table_entry.get_address();
-                        //    println!(" ***** {:016x} : {:016x}", combined_virt_address, physical_address);
+                           println!(" \t >>>> {:016x} : {:016x}", combined_virt_address, physical_address);
                         }
                     }
 

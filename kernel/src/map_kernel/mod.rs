@@ -1,6 +1,7 @@
 //! This module identity maps the Kernel addresses.
-//! It defines one function :
-//! 1. Map Range
+//! It maps the entire RAM and specific MMIO regions
+//! The MMIO regions covered include : the UART, the CLINT and the PLIC.    
+//! No the kernel can access all relevant memory regions while using the virtual paging system
 
 use crate::sv39_mmu::{map, show_mappings};
 use crate::page_manager::alloc;

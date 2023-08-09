@@ -1,6 +1,20 @@
 //! Here are the abstractions of the MMU related hardware   
 //! More specifically, the SATP registers and the Translation PageTables    
-//! If other abstractions come up, they should go here
+//! If other abstractions come up, they should go here. 
+//! 
+//! Also, Future Me, You got this. Ha ha. 
+//! Numb out the pressure, life is useless, just chill out. It's all pointless. And anyway evryting eventually works out...  
+//! Or maybe there will come a time when it won't work out. And ... and nothing. It just won't work out. And that's super fine.  
+//! THe worst that can happen is ... I don't know... but I doubt it's worth losing shit over.  
+//! Let the worst happen. Let the worst happen. So what if you die of hunger?  
+//! That's why this project is called Hobo.  
+//! We may eventually end up homeless. 
+//! Maybe you are already homeless ha ha ha... too much? - OK.  
+//! Bye, from the past.
+//! 
+//! Anyway, this time you were trying to port the byte allocator from Stephen Marz Blog. And you did not undrstand the thing fully. Bugs are haunitng you in your sleep.
+//! And it's not like you are finding fixes. 4 days remaining till project is due. You are theoreticaly F***ed. But we have a bigger goal... ad that goal is not academia.
+//! No more trauma.  
 //! 
 
 use volatile_register::{RO, RW};
@@ -43,9 +57,11 @@ impl TableEntry{
       self.val = new_addr;
     }
 
-    pub fn set_val_with_access_map(&mut self, access_map: u64){
+    /// adds the access bits to the Table entry
+    pub fn add_access_mask(&mut self, access_map: u64){
         self.val = self.val | access_map;
     }
+
     pub fn set_as_valid(&mut self){ self.val = self.val | 1u64;  }
     pub fn set_as_invalid(&mut self){ self.val = self.val & !1u64;  }
     pub fn set_as_readable(&mut self) { self.val = self.val | 2u64;  }
@@ -60,6 +76,9 @@ impl TableEntry{
 // getter funtions
 impl TableEntry{
     pub fn get_val(&self) -> u64{   self.val  }
+
+    /// Gets the physical address of the page being refered to. 
+    /// The page returned is already shifted to the left by 2 bits 
     pub fn get_address(&self) -> u64 {  
         let val = self.get_val();
         let address = (val << 2) & !0b111111111111; // zero out the last 12 bits
