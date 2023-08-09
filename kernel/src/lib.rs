@@ -39,7 +39,6 @@ pub use crate::drivers::timer::Timer;
 
 pub static mut kernel_satp_value_gl: usize = 0;
 pub static mut kernel_root_table_address_gl : usize = 0;
-// static mut kernel_trap_frame_address : usize = 0;
 pub static mut kernel_trap_frame : TrapFrame = TrapFrame::zero();
 
 

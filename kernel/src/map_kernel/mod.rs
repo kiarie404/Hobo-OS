@@ -55,7 +55,7 @@ static UART_ADDRESS_END : usize = 0x1000_0000;
 
 
 // THis function assumes that the memory has already been initialized
-// It also assumes that the KERNEL_ROOT_TABLE_ADDRESS is currently a Mutable Null Address
+// It also assumes that the KERNEL_ROOT_TABLE_ADDRESS is currently a Mutable Static Address
 pub fn identity_map_kernel(root_table_address: usize){
     map_the_ram_sections(root_table_address);
     map_the_mmio_sections(root_table_address);
