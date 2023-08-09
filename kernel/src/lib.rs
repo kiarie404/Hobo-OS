@@ -9,6 +9,9 @@
 #![feature(alloc_error_handler)] // alloc_error_handler, is used to define a custom error handler for out-of-memory situations in programs...
                                 // that use the Rust standard library's allocator (std::alloc). 
                                 // This feature allows developers to have more control over how their program behaves when memory allocation fails due to running out of available memory
+// External crates
+extern crate alloc;
+extern crate core;
 
 // mod utilities;
 pub mod drivers;
@@ -28,6 +31,7 @@ pub mod byte_manager;
 // usage of accessible modules
 use core::{arch::asm, panic::PanicInfo};
 use core::fmt::Write; // enable the use of Write functions in this scope
+pub use alloc::{string::String, *};
 
 pub use crate::interrupt_and_exception_handling::TrapFrame;
 pub use crate::sv39_mmu::{map, show_mappings, unmap, translate};

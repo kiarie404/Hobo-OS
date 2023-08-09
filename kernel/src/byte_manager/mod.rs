@@ -1,14 +1,19 @@
-//! THis is the byte allocator. It also has the glue code that attaches the global allocator to this custom allocator. 
-//! This MODULE was NOT ORIGINALLY made for this project. It was ported to this project.	  
+//! This is the byte allocator. It also has the glue code that chooses this byte allocator as the custom allocator that gets to be used by the compiler when dealing with the heap.. 	
+//! This MODULE was NOT ORIGINALLY made for this project. It was ported to this project.		  
 //! ALL RIGHTS belong to Stephen Marz  
 
 
-//! kmem.rs
-//! Sub-page level: malloc-like allocation system
-//! Stephen Marz
-//! 7 October 2019
+//! -------- metadata --------  
+//! Sub-page level: malloc-like allocation system	
+//! Stephen Marz  	
+//! 7 October 2019	
 
-// porting....
+
+//! THe byte allocator has been built for the Kernel Heap only.  
+//! [undone] : Soon the heap of user programs will have byte allocation too
+//! 
+//!  
+// porting the module....
 use crate::page_manager::alloc as zalloc;
 use crate::page_manager::align as align_val;
 use crate::page_manager::PAGE_SIZE;

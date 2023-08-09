@@ -6,13 +6,17 @@
 use core::panic::PanicInfo;
 use core::arch::asm;
 
+
 // mods used
 use hobo_os::riscv;  // rust-wrapped RISCV instructions
 use hobo_os::drivers; // import the UART, plic, Timer drivers
 use hobo_os::{print, println, stdin}; // acts as std input/output functions
 use hobo_os::interrupt_and_exception_handling as trap_handler; // indirectly lets you initialize the PLIC
 use hobo_os::page_manager;
+use hobo_os::byte_manager;
 use hobo_os::sv39_mmu;
+use hobo_os::String as String;
+use hobo_os::vec::Vec; // uses the alloc crate in the background
 
 
 // defining the entry point function
@@ -22,115 +26,51 @@ use hobo_os::sv39_mmu;
 pub extern "C" fn kinit () {
     println!("I am in Machine mode... mad Chad");
     // Initialize stuff
-        trap_handler::init_kernel_trap_handling();
-        drivers::init_all_drivers();
-        page_manager::init_memory();  // memory initialization
+        trap_handler::init_kernel_trap_handling(); // places a kernel trap frame in the mscratch register
+        drivers::init_all_drivers();  // configure the drivers
+        page_manager::init_memory();  // memory initialization... demarcates the physical memory into pages+descriptors
+        byte_manager::init_kernel_byte_allocation(); // allocates kernel heap pages, demarcates the AllocList linked list on that heap 
     
     // Story Time
     println!("\n-------\n");
     println!("Neutral News : It is time for a story");
-    println!("We are going to test whether the sv39 mmu works");
-    println!(" To do that, we will have to do some things in machine mode ... and some other things in supervisor mode");
-    println!("1. Allocate space for a root table");
-    println!("2. Allocate 3 pages that we will eventually map");
-    println!("3. show the unhappy paths of mapping");
-    println!("4. Map those 3 pages without any errors");
-    println!("5. Show the page table mappings, they should be correct");
-    println!("6. Show the happy path of the translation process");
-    println!("7. Show the unhappy paths of translating");
-    println!("8. Show the unhappy paths of unmapping ");
-    println!("9. Show the happy path of unmapping");
+    println!("We are going to test whether the Byte allocator works for the Kernel Heap");
+    println!(" To do that, we will have to do some things in machine mode ");
+    println!("1. Allocate a byte");
+    println!("2. Allocate a vector");
+    println!("3. Allocate a string");
+   
 
 
-    print!("\n \n Quite the story... ready waste some time (press any key) ---> ");
+    print!("\n \n Quite the story... ready waste some time? (press any key) ---> ");
     stdin::read_line();
     println!("\n-------\n");
 
-    // initialize variables
-    let root_table_address = page_manager::alloc(1).unwrap() as u64;
-    let first_physical_address = page_manager::alloc(3).unwrap() as u64;
-    let second_physical_address = first_physical_address + 4096;
-    let third_physical_address = second_physical_address + 4096;
-    let first_virtual_page_address = 0x0200_1000;
-    let second_virtual_page_address = 0x0200_2000;
-    let third_virtual_page_address = 0x0200_3000;
-    let access_map = 2u64;
+    // Test whether allocating a single byte works
+    let allocated_byte_ptr = byte_manager::kzmalloc(1);
+    let mut val:u8;
+    unsafe {
+        allocated_byte_ptr.write_volatile(10);
+        val = allocated_byte_ptr.read_volatile();
+        println!("Value has been read: {}", val);
+    }
 
-    // display the FACTS
+    println!("{}", val);
+    if val == 10{  println!("Byte alloction works!!");  }
+    
+
+    // Test whether the rust global allocator 
     println!("\n-------\n");
-    println!("Here are the facts before we begin the tests");
-    println!("Root Table address : 0x{:08x}", root_table_address);
-    println!("first_physical_address : 0x{:08x}", first_physical_address);
-    println!("second_physical_adress : 0x{:08x}", second_physical_address);
-    println!("third_physical_adress : 0x{:08x}", third_physical_address);
-    println!("first_virtual_page_address : 0x{:08x}", first_virtual_page_address);
-    println!("second_virtual_page_address : 0x{:08x}", second_virtual_page_address);
-    println!("third_virtual_page_address : 0x{:08x}", third_virtual_page_address);
+    let allocated_String: String = String::from("some String");
+    println!("{}", allocated_String);
 
-    // show unhappy paths of mapping
-        println!("\n-------\n");
-        println!("Mapping a Non_page physical address should FAIL. For Example : 0x80097067");
-        let map_result = sv39_mmu::map(first_virtual_page_address, 0x80097067, access_map, root_table_address);
-        match map_result {
-            Ok(()) => println!("Test Failed : mapping a non_page address should fail"),
-            Err(map_err) => println!("{:?}", map_err)
-        }
+    // Test whether we can use vectors
+    println!("\n-------\n");
+    let allocated_vector: Vec<i32> = [1,2,3].to_vec();
+    println!("{:?}", allocated_vector );
 
-        println!("\n-------\n");
-        println!("Mapping a Non_page virual address should FAIL. For Example : 0x80097067");
-        let map_result = sv39_mmu::map(0x80097067, 0x80097067, access_map, root_table_address);
-        match map_result {
-            Ok(()) => println!("Test Failed : mapping a non_page address should fail"),
-            Err(map_err) => println!("{:?}", map_err)
-        }
-
-
-        println!("\n-------\n");
-        println!("Mapping a Wrong access mask should FAIL. For Example : 0b0111111 should fail");
-        let map_result = sv39_mmu::map(first_virtual_page_address, first_physical_address, 0b0111111, root_table_address);
-        match map_result {
-            Ok(()) => println!("Test Failed : mapping a non_page address should fail"),
-            Err(map_err) => println!("{:?}", map_err)
-        }
-    
-    // Show the Happy Path of Mapping
-        println!("\n-------\n");
-        println!("Mapping the right values should PASS...");
-        let _map_result = sv39_mmu::map(first_virtual_page_address, first_physical_address, access_map, root_table_address).unwrap();
-        let _map_result_2 = sv39_mmu::map(second_virtual_page_address, second_physical_address, access_map, root_table_address).unwrap();
-        let _map_result = sv39_mmu::map(third_virtual_page_address, third_physical_address, access_map, root_table_address).unwrap();
 
     
-    // Show Mappings
-        println!("\n-------\n");
-        println!("Showing the simplified page Table...\n");
-        sv39_mmu::show_mappings(root_table_address);
-        
-    // Showing that translation works
-        println!("\n-------\n");
-        println!("Translating {:08x} should yield {:08x} as seen in the Page Table...", first_virtual_page_address, first_physical_address);
-        let translation_result = sv39_mmu::translate(root_table_address, first_virtual_page_address);
-        match translation_result {
-            Ok(physical_address) => {
-                if physical_address == first_physical_address{  println!("\t Translation works!!");  }
-                else {
-                    println!("\t Trnslation does not work, it gives wrong translations. Instead of yielding {:08x}, it yielded {:08x}", physical_address, first_physical_address);
-                }
-            }
-            Err(trans_err) => println!("{:?}", trans_err)
-        }
-    
-    // Showing some translation errors
-        println!("\n-------\n");
-        println!("Translating a virtual address that has not been allocated should give an error: for example {:08x} should FAIL", third_virtual_page_address + 4096);
-        let translation_result = sv39_mmu::translate(root_table_address, third_virtual_page_address + 4096);
-        match translation_result {
-            Ok(physical_address) => println!("Test Failed: the translation yielded {:08x}", physical_address),
-            Err(trans_err) => println!("Test Passed, it returned a translation error : {:?}", trans_err)
-        }
-    
-    // [undone] : show all translation errors
-
     // [undone] : show unmapping
 
     println!("Switching to Supervisor mode...");
