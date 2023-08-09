@@ -4,7 +4,7 @@ mod mmu_abstractions;
 mod errors;
 mod tests;
 
-use mmu_abstractions::{Table, TableEntry};
+pub use mmu_abstractions::{Table, TableEntry};
 use errors::MappingError;
 use crate::page_manager;
 use crate::{print, println};

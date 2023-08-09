@@ -27,6 +27,7 @@ static START : &usize = unsafe{&HEAP_START};
 static END   : &usize = unsafe{&HEAP_END};
 static mut ALLOC_START : usize = 0;
 static mut NUM_DP : usize = 0; // the number of pages in the heap. THe number of pages also equals the number of descriptors
+pub const PAGE_SIZE: usize = 4096;
 
 // The FullHeapLayout contains all metadata about the Heap stats, The allocations and deallocations
 // The FullHeapLayout contents get updated by the following functions :
@@ -66,8 +67,8 @@ fn clear_entire_heap(){
     }
 }
 
-// aligns memory to the specified order
-fn align (val: usize, order: usize) -> usize{
+/// aligns memory to the specified order
+pub fn align (val: usize, order: usize) -> usize{
     let addition_mask : usize = 1 << order;    // eg if we need to find things in order of 2 ie 2^2, the number will always have 2 zeroes at the LSB
     let over_board : usize = val + addition_mask; // so when we get a non_mutiple number, we make sure it passes the next multiple.  
     let cut_mask : usize = !0 << order; // a mask that will be used to make the last 2 bits become zeroes

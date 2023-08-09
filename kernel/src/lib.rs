@@ -6,6 +6,9 @@
 #![test_runner(crate::test_framework::test_runner)]
 #![reexport_test_harness_main = "test_framework_entry_point"] // give the entrypoint a custom name, and add it to the program flow
 #![feature(error_in_core)] // so as to use the Error trait 
+#![feature(alloc_error_handler)] // alloc_error_handler, is used to define a custom error handler for out-of-memory situations in programs...
+                                // that use the Rust standard library's allocator (std::alloc). 
+                                // This feature allows developers to have more control over how their program behaves when memory allocation fails due to running out of available memory
 
 // mod utilities;
 pub mod drivers;
@@ -18,6 +21,7 @@ pub mod test_framework;
 pub mod map_kernel;
 pub mod riscv;
 pub mod interrupt_and_exception_handling;
+pub mod byte_manager;
 
 
 
