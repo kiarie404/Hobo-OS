@@ -1,5 +1,5 @@
 use super::TrapFrame;
-use crate::drivers::{plic, uart};
+use crate::drivers::{plic, uart, self};
 use crate::{print, println};
 use crate::drivers::timer::Timer;
 use crate::{stdout, stdin};
@@ -70,6 +70,7 @@ fn sort_external_interrupts(){
 
     // sort interrupt
     match interrupt_ID {
+        1..=8 => drivers::handle_interrupt(interrupt_ID),
         10 => handle_UART_interrupts(),
         _  => panic!("Received an unknown external Interrupt ID")
     }

@@ -1,5 +1,5 @@
-//! This is a VirtIO block driver.  
-//! It abstract storage devices hose content can be accessed and managed in chunks AND in a character-wise manner.  
+//! This code is an implementation of a VirtIO block driver,
+//! which abstracts storage devices whose content can be accessed and managed in chunks as well as in a character-wise manner.
 //! It can be used on top of devices like Flash-drive, Hard-disk, CD  
 //! 
 //! The block driver can deal with devices that use the VirtIO protocol only [design]
@@ -139,6 +139,15 @@ pub const VIRTIO_BLK_F_WRITE_ZEROES: u32 = 14;
 // we initialize the block system.
 static mut BLOCK_DEVICES: [Option<BlockDevice>; 8] = [None, None, None, None, None, None, None, None];
 
+/// Initializes a block device by following the VirtIO device initialization protocol.  
+/// It returns a boolean value indicating whether the initialization was successful  	
+/// It does this by :	
+/// 	1. Reseting the device configurations  
+/// 	2. Set ACKNOWLEDGE status bit	
+///	    3. Set the DRIVER status bit	
+/// 	4. Negotiate Featurses between Guest and Host  
+/// 	5. Sets up the Queues by declaring their number and allocating space for them
+/// 	6. Sets the Ststus Register of the Block to "Device OK" -- making it ready for use
 pub fn setup_block_device(ptr: *mut u32) -> bool {
 	unsafe {
 		// We can get the index of the device based on its address.
@@ -148,6 +157,8 @@ pub fn setup_block_device(ptr: *mut u32) -> bool {
 		// 0x1000_8000 is index 7
 		// To get the number that changes over, we shift right 12 places (3 hex digits)
 		let idx = (ptr as usize - virtio::MMIO_VIRTIO_START) >> 12;
+
+
 		// [Driver] Device Initialization
 		// 1. Reset the device (write 0 into status)
 		ptr.add(MmioOffsets::Status.scale32()).write_volatile(0);
@@ -237,6 +248,9 @@ pub fn setup_block_device(ptr: *mut u32) -> bool {
 	}
 }
 
+
+/// Fills the next available descriptor in the VirtIO queue with the provided descriptor.  
+/// Updates the current index and the "next" index in the descriptor to maintain the descriptor chain.
 pub fn fill_next_descriptor(bd: &mut BlockDevice, desc: Descriptor) -> u16 {
 	unsafe {
 		// The ring structure increments here first. This allows us to skip
@@ -255,12 +269,19 @@ pub fn fill_next_descriptor(bd: &mut BlockDevice, desc: Descriptor) -> u16 {
 }
 /// This is now a common block operation for both reads and writes. Therefore,
 /// when one thing needs to change, we can change it for both reads and writes.
-/// There is a lot of error checking that I haven't done. The block device reads
-/// sectors at a time, which are 512 bytes. Therefore, our buffer must be capable
+///	The block device reads sectors at a time, which are 512 bytes. Therefore, our buffer must be capable
 /// of storing multiples of 512 bytes depending on the size. The size is also
 /// a multiple of 512, but we don't really check that.
 /// We DO however, check that we aren't writing to an R/O device. This would
 /// cause a I/O error if we tried to write to a R/O device.
+/// 
+/// Performs a block operation (read or write) on the specified device.  
+/// Creates a request descriptor chain consisting of a header, data, and status descriptors.  
+/// The provided buffer is used for data transfer.	
+/// It calculates the appropriate sector and blktype (read or write) in the header.  
+/// It fills in the data descriptor and the status descriptor  
+/// Notifies the device about the available request in the queue.  
+/// 
 pub fn block_op(dev: usize, buffer: *mut u8, size: u32, offset: u64, write: bool) {
 	unsafe {
 		if let Some(bdev) = BLOCK_DEVICES[dev - 1].as_mut() {
@@ -319,17 +340,38 @@ pub fn block_op(dev: usize, buffer: *mut u8, size: u32, offset: u64, write: bool
 	}
 }
 
+/// A wrapper around block_op specifically for reading data from the block device.  
+/// **dev: usize:** This argument represents the index of the VirtIO block device that you want to perform the read operation on.
+/// **buffer: *mut u8:** This argument is a mutable pointer to a buffer where the data read from the block device will be stored  
+/// **size: u32:** This argument specifies the size of the data you want to read from the block device. 
+///      It's an unsigned 32-bit integer that represents the number of bytes to read.  
+/// **offset: u64:** This argument indicates the offset within the block device's storage where the read operation should start.  
+/// 
+/// Make sure the writes and Reads to the local buffer are ALL VOLATILE
 pub fn read(dev: usize, buffer: *mut u8, size: u32, offset: u64) {
 	block_op(dev, buffer, size, offset, false);
 }
 
+/// A wrapper around block_op specifically for writing data to the block device.  
+/// **dev: usize:** This argument represents the index of the VirtIO block device that you want to perform write read operation on.
+/// **buffer: *mut u8:** - This argument is a mutable pointer to a buffer that contains the data you want to write to the block device. 
+/// The type *mut u8 indicates a mutable pointer to bytes
+/// **size: u32:** This argument specifies the size of the data you want to write the block device. 
+///      It's an unsigned 32-bit integer that represents the number of bytes to write.  
+/// **offset: u64:** This argument indicates the offset within the block device's storage where the read operation should start
 pub fn write(dev: usize, buffer: *mut u8, size: u32, offset: u64) {
 	block_op(dev, buffer, size, offset, true);
 }
 
-/// Here we handle block specific interrupts. Here, we need to check
-/// the used ring and wind it up until we've handled everything.
-/// This is how the device tells us that it's finished a request.
+/// Here we handle block specific interrupts. 
+/// This function handles block-specific interrupts from the VirtIO block device
+/// It checks the used ring in the queue and processes completed requests. 
+/// It iterates through the used ring, frees the resources associated with completed requests,
+/// and advances the ack_used_idx to keep track of processed entries.  
+/// The completed requests' resources (memory buffers) are deallocated using the kfree function.  
+/// This function is responsible for cleaning up after completed I/O operations and potentially awakening processes waiting for I/O completion.
+/// 
+/// This is how the device tells us that it's finished a request.  
 pub fn pending(bd: &mut BlockDevice) {
 	// Here we need to check the used ring and then free the resources
 	// given by the descriptor id.

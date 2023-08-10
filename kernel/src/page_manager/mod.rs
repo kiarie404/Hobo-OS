@@ -125,7 +125,7 @@ fn determine_heap_layout(){
 /// alloc() returns an error if requested zero pages    
 /// it also returns an error if No sufficient contiguous free space is found. At that point, you may need to fragment things
 pub fn alloc(req_pages: usize) -> Result<usize, MemoryAllocationError>{
-    println!(">>>> Allocating {} Pages....", req_pages);
+    // println!(">>>> Allocating {} Pages....", req_pages);  // [test] Add this line when running integration tests 9 and below
     // check if required pages is zero. If its zero, throw an error...
     if req_pages == 0 { return Err(MemoryAllocationError::ZeroPagesRequested("Zero pages were requested from the allocator"));}
     else { // traverse the array of descriptors, lookng for a contiguous free space

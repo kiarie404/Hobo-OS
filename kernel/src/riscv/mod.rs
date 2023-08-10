@@ -1,4 +1,6 @@
 //! This module contains functions for interacting with a riscv CPU  
+//! 
+//! 
 //! It is a bunch of unsafe inline assembly instructions that have been wrapped with safe Rust code  
 //! This is meant to reduce the amount of unsafe blocks in the codebase
 //! 

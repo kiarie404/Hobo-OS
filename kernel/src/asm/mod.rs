@@ -1,4 +1,4 @@
-//! Handles the assembly files
+//! This module bundles up all the assembly files
 
 // instead of linking the assembly files as seperate files,
 // It was opted to just stringify the assembly files and let the rust compiler consume them as inline assembly

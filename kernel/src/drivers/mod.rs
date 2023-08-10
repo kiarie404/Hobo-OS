@@ -11,15 +11,15 @@ use crate::{print, println};
 
 /// Creates an instance of all devvices and configures them to their defaults
 /// It calls the init finctions of each driver
-pub fn init_all_drivers(){
+pub fn init_all_hardwired_drivers(){
     uart::UartDevice::init();
     plic::init();
 }
 
-/// Probe the VirtIO bus for devices that might be
-/// out there.  
-/// This function has been imported as part of the Virtio block by Stephen Marz
-pub fn probe() {
+/// Probe the VirtIO bus for devices that might be out there.  
+/// If it finds a virtIO device, it initializes that device
+/// This function has been ported as part of the Virtio block by Stephen Marz
+pub fn probe_and_initialize_virtio_devices() {
     
 	// Rust's for loop uses an Iterator object, which now has a step_by
 	// modifier to change how much it steps. Also recall that ..= means up

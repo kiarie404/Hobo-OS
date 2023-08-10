@@ -31,7 +31,7 @@ pub mod byte_manager;
 // usage of accessible modules
 use core::{arch::asm, panic::PanicInfo};
 use core::fmt::Write; // enable the use of Write functions in this scope
-pub use alloc::{string::String, *};
+pub use alloc::{string::String, vec};
 
 pub use crate::interrupt_and_exception_handling::TrapFrame;
 pub use crate::sv39_mmu::{map, show_mappings, unmap, translate};

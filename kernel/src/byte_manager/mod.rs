@@ -1,4 +1,5 @@
 //! This is the byte allocator. It also has the glue code that chooses this byte allocator as the custom allocator that gets to be used by the compiler when dealing with the heap.. 	
+//! 
 //! This MODULE was NOT ORIGINALLY made for this project. It was ported to this project.		  
 //! ALL RIGHTS belong to Stephen Marz  
 
